@@ -1,28 +1,19 @@
-import Container from "@mui/material/Container";
 import { useState } from "react";
-
-import Grid from "@mui/material/Grid";
 import PlayerCard from "./PlayerCard";
-import AddIcon from '@mui/icons-material/Add';
-import RemoveIcon from '@mui/icons-material/Remove';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import {Box, Button, Input, Paper, Typography} from "@mui/material";
 
 const Nominator = () => {
   const [newPlayer, setNewPlayer] = useState('');
   const [players, setPlayers] = useState(JSON.parse(localStorage.getItem('players')) || []);
-  const [chosenPlayer, setChosenPlayer] = useState();
+  const [chooser, setChooser] = useState();
   localStorage.setItem('players', JSON.stringify(players));
 
-  const [presentMap, setPresentMap] = useState({});
   const [editing, setEditing] = useState();
 
-  const sorted = [...players].sort((a, b) => b.tickets - a.tickets);
-  const presentPlayers = sorted.filter((player) => presentMap[player.id]);
-  const absentPlayers = sorted.filter((player) => !presentMap[player.id]);
-  console.log('pm', presentMap);
-
+  const s = (a, b) => (a.name < b.name) ?  -1 : ( a.name > b.name) ? 1 : 0;
+  const sorted = [...players].sort(s);
+  const presentPlayers = sorted.filter(p => ['waiting', 'playing'].includes(p.status));
+  const waitingPlayers = sorted.filter(p => p.status==='waiting');
+  const absentPlayers = sorted.filter(p => !p.status );
 
   function onNewPlayerKeyUp(e) {
     if (e.key === 'Enter')
@@ -39,42 +30,57 @@ const Nominator = () => {
   }
 
 
-  function nominate() {
-    console.log('nominating');
+  function choose() {
+    console.log('choosing');
     let tickets = [];
-    presentPlayers.forEach(player => {
+    waitingPlayers.forEach(player => {
       console.log('adding', player);
-      tickets = tickets.concat(Array(player.tickets).fill(player.id));
+      if (player.tickets > 0)
+        tickets = tickets.concat(Array(player.tickets).fill(player.id));
     });
     console.log(tickets);
     if (!tickets.length)
       return;
 
-    const chosen = tickets[Math.floor(Math.random() * tickets.length)];
-    console.log('chose', chosen);
+    const chooserId = tickets[Math.floor(Math.random() * tickets.length)];
+    console.log('chose', chooserId);
 
-    // decrement ticket
     setPlayers(
-      players.map(player => {
-        if (player.id === chosen)
-          return {...player, tickets: Math.max(0, player.tickets - presentPlayers.length)};
-        else
-          return player;
-      }));
+      players.map(p => ({
+            ...p,
+            status: p.status === 'playing' ? undefined : p.id === chooserId ? 'playing' : p.status,
+            tickets: p.tickets -
+              (p.id === chooserId ? 1 : 0),
+          }))
+    );
 
-    const player = players.find(player => player.id === chosen);
-    setChosenPlayer(player);
+    const player = players.find(player => player.id === chooserId);
+    setChooser(player);
   }
 
-  function togglePresent (id) {
+  function togglePresent (player) {
     return () => {
-      if (chosenPlayer)
-        return;
-      console.log('toggling', id);
-      console.log('was present', presentMap[id]);
-      setPlayers(oldPlayers => oldPlayers.map(player => {
-        return player.id !== id ? player : {...player, tickets: player.tickets + ( presentMap[id] ? -1 : 1)}}));
-      setPresentMap(oldPresentPlayers => { return {...oldPresentPlayers, [id]:!oldPresentPlayers[id]}});
+      console.log('toggling', player);
+      if (chooser) {
+        const t = player.status === 'playing' ? 1 : -1;
+        setPlayers(oldPlayers => oldPlayers.map(p =>
+            ({...p,
+              status: p.id === player.id ?
+                  (p.status === 'playing' ? 'waiting' : p.status === 'waiting' ?  'playing' : p.status) :
+                  p.status,
+              tickets: p.tickets + (p.id === chooser.id ?  t : 0),
+            })));
+      }
+      else {
+        const t = player.status === 'waiting' ? -1 : !player.status ? 1 : 0;
+        setPlayers(oldPlayers => oldPlayers.map(p => ({
+          ...p,
+          status: p.id === player.id ?
+              (p.status === 'waiting' ? undefined : !p.status  ? 'waiting' : p.status) :
+              p.status,
+          tickets: p.tickets + (player.id === p.id ? t : 0),
+        })));
+      }
     }
   }
 
@@ -82,7 +88,7 @@ const Nominator = () => {
     return () => {
       console.log('adding ticket');
       setPlayers(oldPlayers => oldPlayers.map(player => {
-        const t = Math.max(0, player.tickets + amt);
+        const t = player.tickets + amt;
         return player.id === id ? {...player, tickets: t} : player
       }));
     }
@@ -90,8 +96,11 @@ const Nominator = () => {
 
   function reset() {
     console.log('reset');
-    setPresentMap({});
-    setChosenPlayer(undefined);
+    setChooser(undefined);
+    setPlayers(oldPlayers => oldPlayers.map(player => ({
+      ...player,
+      status: undefined,
+      tickets: Math.max(0, player.tickets)})));
   }
 
   function toggleEditing(playerId) {
@@ -105,66 +114,63 @@ const Nominator = () => {
       if (window.confirm('delete?')) {
         setPlayers(players.filter(player => player.id !== playerId));
         setEditing(undefined);
-        setPresentMap({...presentMap, [playerId]: false});
       }
     }
   }
 
-  return <Container>
+  return <div>
 
-    <Paper>
-      <Typography align="center" variant="h2">The Table</Typography>
-      <Grid container spacing={3} padding={3}>
+    <div className="drop-shadow p-3 m-2 bg-white">
+      <p className="text-xl">The Table</p>
+      <div className="p-3 flex flex-row flex-wrap">
         {presentPlayers.map(player =>
-        <Grid item xs={6} key={player.id}>
-          <PlayerCard player={player} highlight={player.id === chosenPlayer?.id} togglePresent={togglePresent(player.id)}/>
-        </Grid>
+          <PlayerCard  key={player.id}
+                       player={player}
+                       highlight={player.id === chooser?.id}
+                       diminish={player.status === 'playing'}
+                       togglePresent={togglePresent(player)}/>
       )}
-        <Grid item xs={12}>
-          {!chosenPlayer && !!presentPlayers.length && <Button onClick={nominate} variant="outlined" size="large">Nominate</Button>}
-        </Grid>
 
-        <Grid item xs={6}>
-          {chosenPlayer && <Typography variant="h4">{chosenPlayer.name} nominates</Typography>}
-        </Grid>
-        <Grid item xs={6}>
-          {chosenPlayer && <Button onClick={reset}>Reset</Button>}
-        </Grid>
-      </Grid>
-
-    </Paper>
+        <div className="w-full mt-5 ml-0">
+          { players.filter(p => p.status === 'waiting').length >= 2 &&
+              <button className="bg-blue-200 p-2 m-3" onClick={choose}>Choose</button>}
+        </div>
 
 
-    <Box my={10}>
-      <Grid container spacing={3}>
+        {players.every(p => p.status !== 'waiting') && <div className="p-3" >
+          {chooser && <button onClick={reset}>Reset</button>}
+        </div>}
+      </div>
+
+    </div>
+
+
+    <div className="my-10 flex flex-row flex-wrap">
         {absentPlayers.map(player =>
-          <Grid item lg={3} md={4} sm={6} key={player.id}>
-            <PlayerCard player={player} present={presentMap[player.id]} togglePresent={togglePresent(player.id)}/>
-            <EditIcon fontSize="large" onClick={toggleEditing(player.id)}/>
-            {editing === player.id && <AddIcon fontSize="large" onClick={addTicket(player.id, 1)}/>}
-            {editing === player.id && <RemoveIcon fontSize="large" onClick={addTicket(player.id, -1)}/>}
-            {editing === player.id && <DeleteForeverIcon fontSize="large" sx={{marginX:3}} onClick={deletePlayer(player.id)}/>}
-            {editing === player.id && "id="+player.id}
-          </Grid>
+          <div className="inline-block" key={player.id}>
+            <PlayerCard player={player} togglePresent={togglePresent(player)}/>
+            <button onClick={toggleEditing(player.id)}>edit</button>
+
+            {editing === player.id &&
+                <div className="text-xl flex flex-row space-x-2">
+                  <button onClick={addTicket(player.id, 1)}>+</button>
+                  <button onClick={addTicket(player.id, -1)}>-</button>
+                  <button className="mx-3" onClick={deletePlayer(player.id)}>delete</button>
+                  <p>{"id="+player.id}</p>
+            </div>}
+          </div>
         )}
-      </Grid>
-    </Box>
+    </div>
 
 
-    <Box>
-      <Grid container>
-        <Grid item xs={6}>
-          <Input label="New Player" variant="outlined" value={newPlayer}
+    <div className="flex flex-row space-x-2 p-2">
+          <input value={newPlayer}
              onChange={(e) => setNewPlayer(e.target.value)}
              onKeyUp={onNewPlayerKeyUp}
           />
-        </Grid>
-        <Grid item xs={6}>
-          <Button onClick={addPlayer}>Add Player</Button>
-        </Grid>
-      </Grid>
-    </Box>
-  </Container>;
+          <button onClick={addPlayer}>Add Player</button>
+    </div>
+  </div>;
 };
 
 export default Nominator;
