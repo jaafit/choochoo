@@ -1,4 +1,4 @@
-<% content_for :title, "Nominator" %>
+<% content_for :title, "Someone Pick" %>
 <%
   selecting   = @host.selecting?
   editing     = params[:editing].present?
@@ -11,6 +11,8 @@
     selection_base_tickets_value: nominee.tickets
   } } : {}
 %>
+
+<h1 class="text-4xl font-bold text-center mb-6">Someone Pick</h1>
 
 <div <%= tag.attributes(wrapper) if wrapper.any? %>>
 
@@ -25,14 +27,14 @@
           selectable = selecting && in_room && !is_nominee
 
           classes =
-            if is_nominee then "bg-accent text-accent-content ring-4 ring-accent shadow-2xl"
+            if is_nominee then "bg-accent text-accent-content ring-2 ring-accent shadow-lg"
             elsif in_room then "bg-primary text-primary-content shadow-md"
             else "bg-base-100 shadow-md"
             end
 
           tickets_display = is_nominee ? @host.nominee_remaining_tickets(0) : player.tickets
           badge =
-            if is_nominee then "nominee"
+            if is_nominee then "picker"
             elsif in_room then "present"
             end
         %>
@@ -60,7 +62,7 @@
   <%# ---- Round actions (below the grid) ----------------------------------- %>
   <section class="text-center">
     <% if selecting %>
-      <p class="text-2xl mb-4">Who is playing <%= nominee.name %>'s game?</p>
+      <p class="text-2xl mb-4">Who is playing with <%= nominee.name %>?</p>
       <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div class="justify-self-start">
           <%= button_to "Undo nominate", undo_host_path(@host), method: :post, class: "btn btn-sm btn-ghost" %>
@@ -95,7 +97,7 @@
         <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <div class="justify-self-start">
             <% if @host.undoable_send_off? %>
-              <%= button_to "Undo send-off", undo_host_path(@host), method: :post, class: "btn btn-ghost" %>
+              <%= button_to "Undo send", undo_host_path(@host), method: :post, class: "btn btn-ghost" %>
             <% end %>
           </div>
           <div class="justify-self-center">

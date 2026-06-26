@@ -5,10 +5,10 @@
 <% ticket_target = local_assigns.fetch(:ticket_target, false) %>
 <div class="card <%= classes %> h-full transition-shadow" <%= tag.attributes(data: card_data) if card_data.any? %>>
   <div class="card-body items-center text-center p-1.5 gap-0.5">
-    <% if badge %>
-      <span class="badge badge-xs badge-neutral"><%= badge %></span>
-    <% end %>
+    <%# Always render the badge line (invisible when empty) so card height is
+        constant — toggling a player on/off never shifts the grid. %>
+    <span class="badge badge-xs <%= badge ? "badge-neutral" : "invisible" %>"><%= badge || "·" %></span>
     <span class="text-xs font-semibold leading-tight break-words"><%= player.name %></span>
-    <span class="text-[0.65rem] opacity-70"<%= " data-selection-target=nomineeTickets".html_safe if ticket_target %>><%= tickets_display %> tix</span>
+    <span class="text-[0.65rem] opacity-70"<%= " data-selection-target=nomineeTickets".html_safe if ticket_target %>><%= tickets_display %></span>
   </div>
 </div>

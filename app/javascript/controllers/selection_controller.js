@@ -41,7 +41,7 @@ export default class extends Controller {
 
     if (this.hasNomineeTicketsTarget) {
       const remaining = Math.max(0, this.baseTicketsValue - 1 - this.selected.size)
-      this.nomineeTicketsTarget.textContent = `${remaining} tix`
+      this.nomineeTicketsTarget.textContent = `${remaining}`
     }
 
     if (this.hasMemberInputsTarget) {
