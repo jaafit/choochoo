@@ -9,12 +9,13 @@ Rails.application.routes.draw do
   resources :hosts, param: :uuid, only: [ :show ] do
     member do
       post :nominate
-      post :reset
+      post :undo
+      post :send_off
     end
 
     resources :players, only: [ :create, :destroy ] do
       member do
-        patch :toggle_present
+        patch :toggle_room
         patch :adjust_tickets
       end
     end

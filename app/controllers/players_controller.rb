@@ -1,31 +1,33 @@
 class PlayersController < ApplicationController
   before_action :set_host
-  before_action :set_player, only: [ :destroy, :toggle_present, :adjust_tickets ]
+  before_action :set_player, only: [ :destroy, :toggle_room, :adjust_tickets ]
 
   # POST /hosts/:host_uuid/players
   def create
     @host.players.create(player_params)
-    redirect_to host_path(@host)
+    # `added` lets the view autofocus the input only right after an add.
+    redirect_to host_path(@host, added: 1)
   end
 
   # DELETE /hosts/:host_uuid/players/:id
   def destroy
-    @host.reset_nomination! if @host.nominated_player_id == @player.id
+    @host.update!(nominated_player: nil) if @host.nominated_player_id == @player.id
     @player.destroy
     redirect_to host_path(@host)
   end
 
-  # PATCH /hosts/:host_uuid/players/:id/toggle_present
-  def toggle_present
-    # Locked while a nomination is on the table, matching the original app.
-    @player.toggle_present! unless @host.nominated_player_id
+  # PATCH /hosts/:host_uuid/players/:id/toggle_room — in/out of the room.
+  def toggle_room
+    @player.toggle_room!
+    # A manual room change invalidates the last send-off's undo snapshot.
+    @host.update!(undo_send_off: nil) if @host.undoable_send_off?
     redirect_to host_path(@host)
   end
 
   # PATCH /hosts/:host_uuid/players/:id/adjust_tickets?amount=1
   def adjust_tickets
     @player.adjust_tickets!(params[:amount].to_i)
-    redirect_to host_path(@host)
+    redirect_to host_path(@host, editing: 1)
   end
 
   private

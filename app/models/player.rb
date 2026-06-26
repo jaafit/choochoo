@@ -1,11 +1,10 @@
 class Player < ApplicationRecord
   belongs_to :host
 
-  validates :name, presence: true
+  validates :name, presence: true, length: { maximum: 12 }
 
-  # Mark/unmark "at the table". Matches the original behaviour: arriving adds a
-  # ticket, leaving removes one. No-op while a nomination is in progress.
-  def toggle_present!
+  # Toggle in/out of the room. Arriving earns a ticket, leaving gives it back.
+  def toggle_room!
     delta = present? ? -1 : 1
     update!(present: !present?, tickets: tickets + delta)
   end

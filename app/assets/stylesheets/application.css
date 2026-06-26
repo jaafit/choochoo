@@ -8,3 +8,14 @@
  *
  * Consider organizing styles into separate files for maintainability.
  */
+
+/* Reduce button rounding to 4px (leave circular/square buttons untouched). */
+.btn:not(.btn-circle):not(.btn-square) {
+  border-radius: 0.25rem;
+}
+
+/* Disable DaisyUI's button-pop animation — it replays on every Turbo render,
+   making all buttons "jump" on each click. */
+.btn {
+  animation: none;
+}
