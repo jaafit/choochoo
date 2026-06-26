@@ -1,0 +1,71 @@
+<% content_for :title, "Nominator" %>
+<% locked = @host.nominated_player.present? %>
+
+<%# ---- The Table ---------------------------------------------------------- %>
+<section class="card bg-base-100 shadow-xl">
+  <div class="card-body">
+    <h2 class="text-5xl font-bold text-center mb-4">The Table</h2>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <% @host.present_players.each do |player| %>
+        <%= button_to toggle_present_host_player_path(@host, player), method: :patch,
+              disabled: locked,
+              class: "block w-full p-0 bg-transparent border-0 #{'cursor-not-allowed' if locked}" do %>
+          <%= render "card", player: player, highlight: player.id == @host.nominated_player_id %>
+        <% end %>
+      <% end %>
+    </div>
+
+    <% if !locked && @host.present_players.exists? %>
+      <div class="mt-4">
+        <%= button_to "Nominate", nominate_host_path(@host), method: :post,
+              class: "btn btn-outline btn-lg" %>
+      </div>
+    <% end %>
+
+    <% if locked %>
+      <div class="flex flex-wrap items-center justify-between gap-3 mt-2">
+        <h4 class="text-3xl font-semibold"><%= @host.nominated_player.name %> nominates</h4>
+        <%= button_to "Reset", reset_host_path(@host), method: :post, class: "btn" %>
+      </div>
+    <% end %>
+  </div>
+</section>
+
+<%# ---- Absent players (with edit controls) -------------------------------- %>
+<section class="my-12">
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <% @host.absent_players.each do |player| %>
+      <div class="space-y-2">
+        <%= button_to toggle_present_host_player_path(@host, player), method: :patch,
+              disabled: locked,
+              class: "block w-full p-0 bg-transparent border-0 #{'cursor-not-allowed' if locked}" do %>
+          <%= render "card", player: player, highlight: false %>
+        <% end %>
+
+        <details class="px-1">
+          <summary class="btn btn-circle btn-sm btn-ghost list-none" title="Edit">&#9998;</summary>
+          <div class="flex items-center gap-2 mt-2">
+            <%= button_to "+", adjust_tickets_host_player_path(@host, player, amount: 1),
+                  method: :patch, class: "btn btn-circle btn-sm", title: "Add ticket" %>
+            <%= button_to "−", adjust_tickets_host_player_path(@host, player, amount: -1),
+                  method: :patch, class: "btn btn-circle btn-sm", title: "Remove ticket" %>
+            <%= button_to "🗑", host_player_path(@host, player), method: :delete,
+                  class: "btn btn-circle btn-sm btn-error", title: "Delete player",
+                  form: { data: { turbo_confirm: "delete?" } } %>
+            <span class="text-sm opacity-60">id=<%= player.id %></span>
+          </div>
+        </details>
+      </div>
+    <% end %>
+  </div>
+</section>
+
+<%# ---- Add player --------------------------------------------------------- %>
+<section>
+  <%= form_with model: [@host, Player.new], class: "flex flex-wrap items-center gap-3" do |f| %>
+    <%= f.text_field :name, placeholder: "New Player", autocomplete: "off",
+          class: "input input-bordered" %>
+    <%= f.submit "Add Player", class: "btn btn-primary" %>
+  <% end %>
+</section>

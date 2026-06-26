@@ -1,0 +1,7 @@
+<%# Visual-only player card. locals: player, highlight %>
+<div class="card bg-base-100 <%= highlight ? "shadow-2xl ring-2 ring-primary" : "shadow-md" %> h-full transition-shadow hover:shadow-lg">
+  <div class="card-body items-center text-center p-4">
+    <h4 class="text-2xl font-semibold"><%= player.name %></h4>
+    <h5 class="text-xl opacity-70"><%= player.tickets %> tickets</h5>
+  </div>
+</div>
