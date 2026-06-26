@@ -7,30 +7,31 @@ class HostsController < ApplicationController
     redirect_to host_path(host)
   end
 
-  # GET /hosts/:uuid
+  # GET /hosts/:uuid  or  /player/:player_uuid
   def show
   end
 
-  # POST /hosts/:uuid/nominate
+  # POST nominate — host or any player may nominate (no need to be present).
   def nominate
-    @host.nominate!
-    redirect_to host_path(@host)
+    @host.nominate!(actor: current_player)
+    redirect_to app_root_path
   end
 
-  # POST /hosts/:uuid/undo — undo the nominate, or restore the last send-off.
+  # POST undo — host can undo the latest action; a player only their own latest.
   def undo
-    if @host.selecting?
-      @host.cancel_nomination!
-    elsif @host.undoable_send_off?
-      @host.restore_send_off!
+    if @host.can_undo_latest?(current_player)
+      if @host.selecting?
+        @host.cancel_nomination!
+      elsif @host.undoable_send_off?
+        @host.restore_send_off!
+      end
     end
-    redirect_to host_path(@host)
+    redirect_to app_root_path
   end
 
-  # POST /hosts/:uuid/send_off — commit the round; nominee + selected leave.
-  # The selection (member_ids) comes from the client, not the server.
+  # POST send_off — commit the round; selection (member_ids) comes from the client.
   def send_off
-    @host.send_off!(params[:member_ids] || [])
-    redirect_to host_path(@host)
+    @host.send_off!(params[:member_ids] || [], actor: current_player)
+    redirect_to app_root_path
   end
 end

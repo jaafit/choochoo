@@ -45,7 +45,7 @@ class Host < ApplicationRecord
 
   # Weighted random pick among the players in the room (one entry per ticket).
   # No tickets are spent yet — that happens on send-off. Logs who was present.
-  def nominate!
+  def nominate!(actor: nil)
     pool = present_players.flat_map { |p| Array.new(p.tickets, p) }
     return nil if pool.empty?
 
@@ -55,9 +55,17 @@ class Host < ApplicationRecord
     transaction do
       update!(nominated_player: winner)
       logs.create!(action: "nominate", player_name: winner.name, player_id: winner.id,
-                   data: { "others" => others })
+                   actor_player_id: actor&.id, data: { "others" => others })
     end
     winner
+  end
+
+  # Can the given actor (a Player, or nil for the host) undo the latest action?
+  # The host can undo anything; a player only their own most-recent action.
+  def can_undo_latest?(actor)
+    log = latest_log
+    return false unless log
+    actor.nil? || log.actor_player_id == actor.id
   end
 
   # Cancel the current nomination (undo of a nominate): drop its log entry too.
@@ -72,14 +80,15 @@ class Host < ApplicationRecord
   # Commit the round: the nominee pays their tickets, then the nominee and the
   # selected players leave the room. The send_off log entry doubles as the undo
   # snapshot. `member_ids` is the ephemeral selection from the session.
-  def send_off!(member_ids)
+  def send_off!(member_ids, actor: nil)
     return unless selecting?
 
     nominee = nominated_player
     members = selectable_players.where(id: member_ids).order(Arel.sql("name COLLATE NOCASE ASC")).to_a
     new_tickets = [ 0, nominee.tickets - 1 - members.size ].max
     transaction do
-      logs.create!(action: "send_off", player_name: nominee.name, player_id: nominee.id, data: {
+      logs.create!(action: "send_off", player_name: nominee.name, player_id: nominee.id,
+                   actor_player_id: actor&.id, data: {
         "members" => members.map(&:name),
         "member_ids" => members.map(&:id),
         "delta" => new_tickets - nominee.tickets,

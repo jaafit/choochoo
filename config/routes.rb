@@ -22,4 +22,16 @@ Rails.application.routes.draw do
 
     resources :logs, only: [ :index ]
   end
+
+  # Player's limited-access view, authenticated by their own UUID. The host UUID
+  # never appears in these URLs.
+  scope "player/:player_uuid", as: :player do
+    get   "",         to: "hosts#show",         as: ""
+    post  "nominate", to: "hosts#nominate",     as: :nominate
+    post  "undo",     to: "hosts#undo",         as: :undo
+    post  "send_off", to: "hosts#send_off",     as: :send_off
+    post  "players",  to: "players#create",     as: :players
+    patch "players/:id/toggle_room", to: "players#toggle_room", as: :toggle_room
+    get   "logs",     to: "logs#index",         as: :logs
+  end
 end

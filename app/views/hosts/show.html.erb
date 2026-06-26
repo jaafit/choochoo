@@ -1,11 +1,12 @@
 <% content_for :title, "Someone Pick" %>
 <%
   selecting   = @host.selecting?
-  editing     = params[:editing].present?
+  editing     = host_view? && params[:editing].present?
   nominee     = @host.nominated_player
+  can_undo    = @host.can_undo_latest?(current_player)
 
   # The selection controller wraps the grid + buttons only while selecting, so a
-  # client-side "who's playing" choice can update the grid and the Send selected form.
+  # client-side "who's playing" choice can update the grid and the Send form.
   wrapper = selecting ? { data: {
     controller: "selection",
     selection_base_tickets_value: nominee.tickets
@@ -23,8 +24,8 @@
         <%
           is_nominee = selecting && player.id == nominee.id
           in_room    = player.present?
-          # In-room players (other than the nominee) are selected client-side.
           selectable = selecting && in_room && !is_nominee
+          mine       = !host_view? && current_player&.id == player.id
 
           classes =
             if is_nominee then "bg-accent text-accent-content ring-2 ring-accent shadow-lg"
@@ -43,16 +44,16 @@
           <%# Pure client-side toggle — no network call. %>
           <%= render "card", player: player,
                 classes: "#{classes} cursor-pointer select-none",
-                tickets_display: tickets_display, badge: badge,
+                tickets_display: tickets_display, badge: badge, mine: mine,
                 card_data: { selection_target: "player", player_id: player.id, action: "click->selection#toggle" } %>
         <% elsif is_nominee %>
           <%= render "card", player: player, classes: classes,
-                tickets_display: tickets_display, badge: badge, ticket_target: true %>
+                tickets_display: tickets_display, badge: badge, ticket_target: true, mine: mine %>
         <% else %>
-          <%= button_to toggle_room_host_player_path(@host, player), method: :patch,
+          <%= button_to app_toggle_room_path(player), method: :patch,
                 class: "block w-full p-0 bg-transparent border-0" do %>
             <%= render "card", player: player, classes: classes,
-                  tickets_display: tickets_display, badge: badge %>
+                  tickets_display: tickets_display, badge: badge, mine: mine %>
           <% end %>
         <% end %>
       <% end %>
@@ -65,49 +66,75 @@
       <p class="text-2xl mb-4">Who is playing with <%= nominee.name %>?</p>
       <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div class="justify-self-start">
-          <%= button_to "Undo nominate", undo_host_path(@host), method: :post, class: "btn btn-sm btn-ghost" %>
+          <% if can_undo %>
+            <%= button_to "Undo nominate", app_undo_path, method: :post, class: "btn btn-sm btn-ghost" %>
+          <% end %>
         </div>
         <div class="justify-self-center flex items-center gap-3">
           <button type="button" class="btn btn-ghost border border-base-content/30" data-action="selection#selectAll">Select all</button>
-          <%= form_with url: send_off_host_path(@host), method: :post do %>
+          <%= form_with url: app_send_off_path, method: :post do %>
             <span data-selection-target="memberInputs"></span>
             <%= submit_tag "Send", class: "btn btn-accent" %>
           <% end %>
         </div>
         <div></div>
       </div>
+
+    <% elsif editing && @host.present_players.count == 1 %>
+      <%# Host edit controls for the single present player. %>
+      <% p = @host.present_players.first %>
+      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div class="justify-self-start">
+          <%= button_to "delete", host_player_path(@host, p), method: :delete,
+                class: "btn btn-error", form: { data: { turbo_confirm: "Delete #{p.name}?" } } %>
+        </div>
+        <div class="justify-self-center flex items-center gap-3">
+          <%= button_to "add", adjust_tickets_host_player_path(@host, p, amount: 1), method: :patch, class: "btn" %>
+          <%= button_to "subtract", adjust_tickets_host_player_path(@host, p, amount: -1), method: :patch, class: "btn" %>
+        </div>
+        <div class="justify-self-end">
+          <%= link_to "done", host_path(@host), class: "btn" %>
+        </div>
+      </div>
+
     <% else %>
       <% present_count = @host.present_players.count %>
-      <% if editing && present_count == 1 %>
-        <% p = @host.present_players.first %>
-        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <div class="justify-self-start">
-            <%= button_to "delete", host_player_path(@host, p), method: :delete,
-                  class: "btn btn-error", form: { data: { turbo_confirm: "Delete #{p.name}?" } } %>
-          </div>
-          <div class="justify-self-center flex items-center gap-3">
-            <%= button_to "add", adjust_tickets_host_player_path(@host, p, amount: 1), method: :patch, class: "btn" %>
-            <%= button_to "subtract", adjust_tickets_host_player_path(@host, p, amount: -1), method: :patch, class: "btn" %>
-          </div>
-          <div class="justify-self-end">
-            <%= link_to "done", host_path(@host), class: "btn" %>
-          </div>
+      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div class="justify-self-start">
+          <% if @host.undoable_send_off? && can_undo %>
+            <%= button_to "Undo send", app_undo_path, method: :post, class: "btn btn-ghost" %>
+          <% end %>
         </div>
-      <% else %>
-        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <div class="justify-self-start">
-            <% if @host.undoable_send_off? %>
-              <%= button_to "Undo send", undo_host_path(@host), method: :post, class: "btn btn-ghost" %>
-            <% end %>
+        <div class="justify-self-center">
+          <% if host_view? && present_count == 1 %>
+            <%= link_to "edit", host_path(@host, editing: 1), class: "btn btn-outline btn-neutral" %>
+          <% elsif host_view? && present_count >= 2 %>
+            <%= button_to "Nominate", app_nominate_path, method: :post, class: "btn btn-primary btn-lg" %>
+          <% elsif !host_view? && present_count >= 1 %>
+            <%= button_to "Nominate", app_nominate_path, method: :post, class: "btn btn-primary btn-lg" %>
+          <% end %>
+        </div>
+        <div class="justify-self-end">
+          <% if host_view? && present_count == 1 %>
+            <label for="share_modal" class="btn btn-outline btn-neutral">share</label>
+          <% end %>
+        </div>
+      </div>
+
+      <% if host_view? && present_count == 1 %>
+        <% p = @host.present_players.first %>
+        <% link = player_url(p.uuid) %>
+        <input type="checkbox" id="share_modal" class="modal-toggle" />
+        <div class="modal" role="dialog">
+          <div class="modal-box text-center">
+            <h3 class="text-lg font-bold mb-3"><%= p.name %>'s link</h3>
+            <div class="mx-auto w-56 bg-white p-3 rounded"><%= qr_svg(link) %></div>
+            <p class="mt-3 text-sm break-all"><%= link %></p>
+            <div class="modal-action justify-center">
+              <label for="share_modal" class="btn">Close</label>
+            </div>
           </div>
-          <div class="justify-self-center">
-            <% if present_count == 1 %>
-              <%= link_to "edit", host_path(@host, editing: 1), class: "btn btn-outline btn-secondary" %>
-            <% elsif present_count >= 2 %>
-              <%= button_to "Nominate", nominate_host_path(@host), method: :post, class: "btn btn-primary btn-lg" %>
-            <% end %>
-          </div>
-          <div></div>
+          <label class="modal-backdrop" for="share_modal">Close</label>
         </div>
       <% end %>
     <% end %>
@@ -116,7 +143,7 @@
 
 <%# ---- Add player --------------------------------------------------------- %>
 <section class="mt-8">
-  <%= form_with model: [@host, Player.new], class: "flex flex-wrap items-center gap-3" do |f| %>
+  <%= form_with url: app_players_path, scope: :player, class: "flex flex-wrap items-center gap-3" do |f| %>
     <%= f.text_field :name, placeholder: "New Player", autocomplete: "off",
           autofocus: params[:added].present?, maxlength: 12, class: "input input-bordered" %>
     <%= f.submit "Add Player", class: "btn btn-secondary" %>
@@ -125,5 +152,5 @@
 
 <%# ---- Log ---------------------------------------------------------------- %>
 <section class="mt-10 text-center">
-  <%= link_to "Show log", host_logs_path(@host), class: "btn btn-ghost btn-sm" %>
+  <%= link_to "Show log", app_logs_path, class: "btn btn-ghost btn-sm" %>
 </section>

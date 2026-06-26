@@ -2,7 +2,7 @@
 
 <section class="mt-2 mb-6 text-center">
   <h2 class="text-3xl font-bold">Log</h2>
-  <%= link_to "← Back", host_path(@host), class: "btn btn-ghost btn-sm mt-2" %>
+  <%= link_to "← Back", app_root_path, class: "btn btn-ghost btn-sm mt-2" %>
 </section>
 
 <section class="max-w-xl mx-auto">
@@ -40,13 +40,13 @@
 
     <div class="flex items-center justify-between mt-6">
       <% if @page > 1 %>
-        <%= link_to "← Newer", host_logs_path(@host, page: @page - 1), class: "btn btn-sm" %>
+        <%= link_to "← Newer", app_logs_path(page: @page - 1), class: "btn btn-sm" %>
       <% else %>
         <span></span>
       <% end %>
       <span class="text-sm opacity-60">page <%= @page %></span>
       <% if @has_next %>
-        <%= link_to "Older →", host_logs_path(@host, page: @page + 1), class: "btn btn-sm" %>
+        <%= link_to "Older →", app_logs_path(page: @page + 1), class: "btn btn-sm" %>
       <% else %>
         <span></span>
       <% end %>
