@@ -1,0 +1,55 @@
+<% content_for :title, "Log" %>
+
+<section class="mt-2 mb-6 text-center">
+  <h2 class="text-3xl font-bold">Log</h2>
+  <%= link_to "← Back", host_path(@host), class: "btn btn-ghost btn-sm mt-2" %>
+</section>
+
+<section class="max-w-xl mx-auto">
+  <% if @logs.empty? %>
+    <p class="text-center opacity-70">No changes yet.</p>
+  <% else %>
+    <ul class="divide-y divide-base-300">
+      <% @logs.each do |log| %>
+        <li class="py-3 flex items-center gap-3">
+          <span class="text-sm opacity-60 whitespace-nowrap w-28 shrink-0">
+            <%= log.created_at.strftime("%b %-d, %Y") %>
+          </span>
+          <div class="text-left">
+            <% case log.action %>
+            <% when "nominate" %>
+              <strong><%= log.player_name %></strong> nominated,
+              <%= render "logs/others", names: [ log.player_name ] + log.other_names, suffix: "present" %>
+            <% when "send_off" %>
+              <strong><%= log.player_name %></strong> sent off,
+              <%= render "logs/others", names: [ log.player_name ] + log.other_names, suffix: "players" %>
+              <% if log.net_ticket_delta %>
+                <span class="opacity-60">(<%= log.net_ticket_delta.zero? ? "-0" : log.net_ticket_delta %> tix)</span>
+              <% end %>
+            <% when "add" %>
+              added a ticket to <strong><%= log.player_name %></strong>
+            <% when "subtract" %>
+              subtracted a ticket from <strong><%= log.player_name %></strong>
+            <% when "delete" %>
+              deleted <strong><%= log.player_name %></strong>
+            <% end %>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+
+    <div class="flex items-center justify-between mt-6">
+      <% if @page > 1 %>
+        <%= link_to "← Newer", host_logs_path(@host, page: @page - 1), class: "btn btn-sm" %>
+      <% else %>
+        <span></span>
+      <% end %>
+      <span class="text-sm opacity-60">page <%= @page %></span>
+      <% if @has_next %>
+        <%= link_to "Older →", host_logs_path(@host, page: @page + 1), class: "btn btn-sm" %>
+      <% else %>
+        <span></span>
+      <% end %>
+    </div>
+  <% end %>
+</section>

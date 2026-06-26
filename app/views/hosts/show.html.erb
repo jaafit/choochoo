@@ -16,7 +16,7 @@
 
   <%# ---- One grid, all players (at the top) ------------------------------- %>
   <section class="mt-2 mb-6">
-    <div class="grid grid-cols-6 gap-1.5 sm:gap-3">
+    <div class="grid grid-cols-4 gap-1.5 sm:gap-3">
       <% @host.roster.each do |player| %>
         <%
           is_nominee = selecting && player.id == nominee.id
@@ -61,9 +61,9 @@
   <section class="text-center">
     <% if selecting %>
       <p class="text-2xl mb-4">Who is playing <%= nominee.name %>'s game?</p>
-      <div class="grid grid-cols-3 items-center">
+      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div class="justify-self-start">
-          <%= button_to "Undo nominate", undo_host_path(@host), method: :post, class: "btn" %>
+          <%= button_to "Undo nominate", undo_host_path(@host), method: :post, class: "btn btn-sm btn-ghost" %>
         </div>
         <div class="justify-self-center flex items-center gap-3">
           <button type="button" class="btn btn-ghost border border-base-content/30" data-action="selection#selectAll">Select all</button>
@@ -78,7 +78,7 @@
       <% present_count = @host.present_players.count %>
       <% if editing && present_count == 1 %>
         <% p = @host.present_players.first %>
-        <div class="grid grid-cols-3 items-center">
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <div class="justify-self-start">
             <%= button_to "delete", host_player_path(@host, p), method: :delete,
                   class: "btn btn-error", form: { data: { turbo_confirm: "Delete #{p.name}?" } } %>
@@ -92,10 +92,10 @@
           </div>
         </div>
       <% else %>
-        <div class="grid grid-cols-3 items-center">
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <div class="justify-self-start">
             <% if @host.undoable_send_off? %>
-              <%= button_to "Undo send-off", undo_host_path(@host), method: :post, class: "btn" %>
+              <%= button_to "Undo send-off", undo_host_path(@host), method: :post, class: "btn btn-ghost" %>
             <% end %>
           </div>
           <div class="justify-self-center">
@@ -119,4 +119,9 @@
           autofocus: params[:added].present?, maxlength: 12, class: "input input-bordered" %>
     <%= f.submit "Add Player", class: "btn btn-secondary" %>
   <% end %>
+</section>
+
+<%# ---- Log ---------------------------------------------------------------- %>
+<section class="mt-10 text-center">
+  <%= link_to "Show log", host_logs_path(@host), class: "btn btn-ghost btn-sm" %>
 </section>

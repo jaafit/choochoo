@@ -19,5 +19,7 @@ Rails.application.routes.draw do
         patch :adjust_tickets
       end
     end
+
+    resources :logs, only: [ :index ]
   end
 end

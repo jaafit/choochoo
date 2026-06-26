@@ -8,9 +8,4 @@ class Player < ApplicationRecord
     delta = present? ? -1 : 1
     update!(present: !present?, tickets: tickets + delta)
   end
-
-  # Edit-mode +/- a ticket, floored at 0.
-  def adjust_tickets!(amount)
-    update!(tickets: [ 0, tickets + amount ].max)
-  end
 end

@@ -10,14 +10,24 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_26_144240) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_26_172640) do
   create_table "hosts", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "nominated_player_id"
-    t.json "undo_send_off"
     t.datetime "updated_at", null: false
     t.string "uuid"
     t.index ["uuid"], name: "index_hosts_on_uuid", unique: true
+  end
+
+  create_table "logs", force: :cascade do |t|
+    t.string "action", null: false
+    t.datetime "created_at", null: false
+    t.json "data", default: {}
+    t.integer "host_id", null: false
+    t.integer "player_id"
+    t.string "player_name"
+    t.datetime "updated_at", null: false
+    t.index ["host_id"], name: "index_logs_on_host_id"
   end
 
   create_table "players", force: :cascade do |t|
@@ -30,5 +40,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_144240) do
     t.index ["host_id"], name: "index_players_on_host_id"
   end
 
+  add_foreign_key "logs", "hosts"
   add_foreign_key "players", "hosts"
 end
