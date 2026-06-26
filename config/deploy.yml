@@ -1,0 +1,59 @@
+# Name of your application. Used to uniquely configure containers.
+service: nominator
+
+# Name of the container image. Use your GitHub username (lowercase) — the full
+# image becomes ghcr.io/<github-user>/nominator (registry server is set below).
+image: jaafit/nominator
+
+# Deploy to your DigitalOcean droplet — replace with its public IP.
+servers:
+  web:
+    - 137.184.27.57
+
+# Kamal's proxy terminates SSL (via Let's Encrypt) and routes to the container.
+# Point a DNS A record for `host` at the droplet's IP before deploying.
+#
+# No domain yet? Set `ssl: false`, remove `host`, AND set
+# `config.force_ssl = false` in config/environments/production.rb so you can
+# reach the app over plain http://<droplet-ip>.
+proxy:
+  ssl: true
+  host: someonepick.com
+  # Thruster listens on 80 inside the container (the default), so app_port is fine.
+
+# We build the image locally and push it to GitHub Container Registry; the
+# droplet pulls from there. (ghcr.io repos are private by default.)
+registry:
+  server: ghcr.io
+  username: jaafit
+
+  # A GitHub personal access token with `write:packages` scope, read from
+  # .kamal/secrets (never commit the real value).
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+# Build the image locally for the droplet's architecture (DO droplets are amd64).
+builder:
+  arch: amd64
+
+# Inject ENV into the container. RAILS_MASTER_KEY decrypts credentials and is
+# read from .kamal/secrets (which reads config/master.key).
+env:
+  secret:
+    - RAILS_MASTER_KEY
+
+# Persist SQLite (and everything under storage/) across deploys and restarts by
+# mounting a Docker named volume at the app's storage directory. This is what
+# keeps the database alive when containers are replaced.
+volumes:
+  - "nominator_storage:/rails/storage"
+
+# Keep fingerprinted assets across versions so in-flight requests don't 404.
+asset_path: /rails/public/assets
+
+# Handy shortcuts: "bin/kamal console", "bin/kamal shell", "bin/kamal dbc".
+aliases:
+  console: app exec --interactive --reuse "bin/rails console"
+  shell: app exec --interactive --reuse "bash"
+  logs: app logs -f
+  dbc: app exec --interactive --reuse "bin/rails dbconsole"
