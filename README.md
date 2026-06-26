@@ -1,70 +1,29 @@
-# Getting Started with Create React App
+# Nominator
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A weighted random "nominator". Add players, mark who's present (they move to **The
+Table**), then hit **Nominate** to pick a present player at random — weighted by how
+many tickets each holds. Winning spends tickets; everyone who keeps showing up and
+losing accrues more, so picks even out over time. Players persist in `localStorage`.
 
-## Available Scripts
+## Stack
 
-In the project directory, you can run:
+Plain JavaScript with [Tailwind CSS](https://tailwindcss.com/) +
+[DaisyUI](https://daisyui.com/), both loaded via CDN. **No build step, no framework.**
 
-### `npm start`
+- `index.html` — page shell + CDN links
+- `app.js` — all state and rendering
+- `public/` — favicon, icons, manifest
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Running it
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+It's a static site — open `index.html` in a browser, or serve the folder:
 
-### `npm test`
+```sh
+npm start        # serves on http://localhost:3000
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Deploying
 
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Copy `index.html`, `app.js`, and `public/` to any static host. There is nothing to
+build. (Tailwind is loaded via the Play CDN, which is fine for this small personal
+app; if you ever want a precompiled stylesheet, swap in a real Tailwind/DaisyUI build.)
