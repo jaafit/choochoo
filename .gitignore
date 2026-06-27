@@ -33,6 +33,7 @@
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 
-./idea/
+# Ignore JetBrains IDE project files.
+/.idea/
 
 /.kamal/secrets
