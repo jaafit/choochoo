@@ -5,6 +5,9 @@
   nominee     = @host.nominated_player
   can_undo    = @host.can_undo_latest?(current_player)
 
+  # The single present player whose card/controls are being edited (host only).
+  editing_player = (editing && @host.present_players.count == 1) ? @host.present_players.first : nil
+
   # The selection controller wraps the grid + buttons only while selecting, so a
   # client-side "who's playing" choice can update the grid and the Send form.
   wrapper = selecting ? { data: {
@@ -23,19 +26,28 @@
       <% @host.roster.each do |player| %>
         <%
           is_nominee = selecting && player.id == nominee.id
+          is_editing = editing_player && player.id == editing_player.id
           in_room    = player.present?
           selectable = selecting && in_room && !is_nominee
           mine       = !host_view? && current_player&.id == player.id
 
           classes =
             if is_nominee then "bg-accent text-accent-content ring-2 ring-accent shadow-lg"
+            elsif is_editing then "bg-secondary text-secondary-content shadow-md"
             elsif in_room then "bg-primary text-primary-content shadow-md"
             else "bg-base-100 shadow-md"
             end
 
-          tickets_display = is_nominee ? @host.nominee_remaining_tickets(0) : player.tickets
+          # While editing, show the player's true count (before the +1 they earned
+          # for being present).
+          tickets_display =
+            if is_nominee then @host.nominee_remaining_tickets(0)
+            elsif is_editing then [ player.tickets - 1, 0 ].max
+            else player.tickets
+            end
           badge =
             if is_nominee then "picker"
+            elsif is_editing then "editing"
             elsif in_room then "present"
             end
         %>
@@ -46,9 +58,9 @@
                 classes: "#{classes} cursor-pointer select-none",
                 tickets_display: tickets_display, badge: badge, mine: mine,
                 card_data: { selection_target: "player", player_id: player.id, action: "click->selection#toggle" } %>
-        <% elsif is_nominee %>
+        <% elsif is_nominee || is_editing %>
           <%= render "card", player: player, classes: classes,
-                tickets_display: tickets_display, badge: badge, ticket_target: true, mine: mine %>
+                tickets_display: tickets_display, badge: badge, ticket_target: is_nominee, mine: mine %>
         <% else %>
           <%= button_to app_toggle_room_path(player), method: :patch,
                 class: "block w-full p-0 bg-transparent border-0" do %>
@@ -89,11 +101,13 @@
                 class: "btn btn-error", form: { data: { turbo_confirm: "Delete #{p.name}?" } } %>
         </div>
         <div class="justify-self-center flex items-center gap-3">
-          <%= button_to "add", adjust_tickets_host_player_path(@host, p, amount: 1), method: :patch, class: "btn" %>
-          <%= button_to "subtract", adjust_tickets_host_player_path(@host, p, amount: -1), method: :patch, class: "btn" %>
+          <%= button_to "-", adjust_tickets_host_player_path(@host, p, amount: -1), method: :patch, class: "btn" %>
+          <%= button_to "+", adjust_tickets_host_player_path(@host, p, amount: 1), method: :patch, class: "btn" %>
         </div>
         <div class="justify-self-end">
-          <%= link_to "done", host_path(@host), class: "btn" %>
+          <%# Done leaves the room entirely (gives back the present ticket), rather
+              than returning to the 'present' state. %>
+          <%= button_to "done", app_toggle_room_path(p), method: :patch, class: "btn" %>
         </div>
       </div>
 

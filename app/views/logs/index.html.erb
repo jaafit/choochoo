@@ -18,20 +18,20 @@
           <div class="text-left">
             <% case log.action %>
             <% when "nominate" %>
-              <strong><%= log.player_name %></strong> nominated,
-              <%= render "logs/others", names: [ log.player_name ] + log.other_names, suffix: "present" %>
+              <strong><%= log.actor_label %></strong> nominated <strong><%= log.player_name %></strong>
+              <%# Everyone present but not nominated earns a ticket. %>
+              <%= render "logs/others", names: [ log.player_name ] + log.other_names, suffix: "present",
+                    notes: log.other_names.index_with { "+1 tix" } %>
             <% when "send_off" %>
-              <strong><%= log.player_name %></strong> sent,
-              <%= render "logs/others", names: [ log.player_name ] + log.other_names, suffix: "players" %>
-              <% if log.net_ticket_delta %>
-                <span class="opacity-60">(<%= log.net_ticket_delta.zero? ? "-0" : log.net_ticket_delta %> tix)</span>
-              <% end %>
+              <strong><%= log.actor_label %></strong> started <strong><%= log.player_name %></strong>'s game
+              <%= render "logs/others", names: [ log.player_name ] + log.other_names, suffix: "players",
+                    notes: { log.player_name => log.net_ticket_label } %>
             <% when "add" %>
-              added a ticket to <strong><%= log.player_name %></strong>
+              <strong><%= log.actor_label %></strong> added a ticket to <strong><%= log.player_name %></strong>
             <% when "subtract" %>
-              subtracted a ticket from <strong><%= log.player_name %></strong>
+              <strong><%= log.actor_label %></strong> subtracted a ticket from <strong><%= log.player_name %></strong>
             <% when "delete" %>
-              deleted <strong><%= log.player_name %></strong>
+              <strong><%= log.actor_label %></strong> deleted <strong><%= log.player_name %></strong>
             <% end %>
           </div>
         </li>

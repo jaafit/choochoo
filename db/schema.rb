@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_26_192702) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_26_200000) do
   create_table "hosts", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "nominated_player_id"
@@ -21,6 +21,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_192702) do
 
   create_table "logs", force: :cascade do |t|
     t.string "action", null: false
+    t.string "actor_name"
     t.integer "actor_player_id"
     t.datetime "created_at", null: false
     t.json "data", default: {}

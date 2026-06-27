@@ -55,7 +55,8 @@ class Host < ApplicationRecord
     transaction do
       update!(nominated_player: winner)
       logs.create!(action: "nominate", player_name: winner.name, player_id: winner.id,
-                   actor_player_id: actor&.id, data: { "others" => others })
+                   actor_player_id: actor&.id, actor_name: actor&.name,
+                   data: { "others" => others })
     end
     winner
   end
@@ -88,7 +89,7 @@ class Host < ApplicationRecord
     new_tickets = [ 0, nominee.tickets - 1 - members.size ].max
     transaction do
       logs.create!(action: "send_off", player_name: nominee.name, player_id: nominee.id,
-                   actor_player_id: actor&.id, data: {
+                   actor_player_id: actor&.id, actor_name: actor&.name, data: {
         "members" => members.map(&:name),
         "member_ids" => members.map(&:id),
         "delta" => new_tickets - nominee.tickets,

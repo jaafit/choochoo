@@ -1,13 +1,21 @@
-<%# A visible count that reveals the names on click. locals: names, suffix %>
+<%# A visible count that reveals the names on click. locals: names, suffix.
+    optional: notes — { name => text } appended next to that name in the list. %>
+<% notes = local_assigns.fetch(:notes, {}) %>
 <% if names.any? %>
-  <details class="dropdown dropdown-end inline-block align-middle">
-    <summary class="btn btn-xs btn-outline"><%= names.size %> <%= suffix %></summary>
-    <ul class="dropdown-content menu bg-base-200 rounded-box shadow z-[1] w-44 p-2 mt-1 text-left">
+  <%# Focus-based dropdown so a click outside (blur) closes it. %>
+  <div class="dropdown dropdown-end inline-block align-middle">
+    <div tabindex="0" role="button" class="btn btn-xs btn-outline"><%= names.size %> <%= suffix %></div>
+    <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box shadow z-[1] w-44 p-2 mt-1 text-left">
       <% names.sort_by(&:downcase).each do |n| %>
-        <li><span><%= n %></span></li>
+        <li><span class="flex justify-between gap-2">
+          <span><%= n %></span>
+          <% if notes[n] %>
+            <span class="opacity-60 whitespace-nowrap"><%= notes[n] %></span>
+          <% end %>
+        </span></li>
       <% end %>
     </ul>
-  </details>
+  </div>
 <% else %>
   <span class="badge badge-sm badge-ghost align-middle"><%= names.size %> <%= suffix %></span>
 <% end %>
