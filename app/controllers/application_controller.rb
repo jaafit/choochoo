@@ -69,6 +69,16 @@ class ApplicationController < ActionController::Base
   end
   helper_method :app_toggle_room_path
 
+  def app_gift_path(player)
+    host_view? ? gift_host_player_path(@host, player) : player_gift_path(@current_player.uuid, player)
+  end
+  helper_method :app_gift_path
+
+  def app_ungift_path(player)
+    host_view? ? ungift_host_player_path(@host, player) : player_ungift_path(@current_player.uuid, player)
+  end
+  helper_method :app_ungift_path
+
   def app_logs_path(opts = {})
     host_view? ? host_logs_path(@host, opts) : player_logs_path(@current_player.uuid, opts)
   end

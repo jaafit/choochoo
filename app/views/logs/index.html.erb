@@ -32,6 +32,8 @@
               <strong><%= log.actor_label %></strong> subtracted a ticket from <strong><%= log.player_name %></strong>
             <% when "delete" %>
               <strong><%= log.actor_label %></strong> deleted <strong><%= log.player_name %></strong>
+            <% when "gift" %>
+              <strong><%= log.actor_label %></strong> gave a ticket to <strong><%= log.player_name %></strong>
             <% end %>
           </div>
         </li>

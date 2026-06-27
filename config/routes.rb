@@ -17,6 +17,8 @@ Rails.application.routes.draw do
       member do
         patch :toggle_room
         patch :adjust_tickets
+        patch :gift
+        patch :ungift
       end
     end
 
@@ -32,6 +34,8 @@ Rails.application.routes.draw do
     post  "send_off", to: "hosts#send_off",     as: :send_off
     post  "players",  to: "players#create",     as: :players
     patch "players/:id/toggle_room", to: "players#toggle_room", as: :toggle_room
+    patch "players/:id/gift",        to: "players#gift",        as: :gift
+    patch "players/:id/ungift",      to: "players#ungift",      as: :ungift
     get   "logs",     to: "logs#index",         as: :logs
   end
 end

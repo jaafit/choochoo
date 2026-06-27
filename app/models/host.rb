@@ -141,6 +141,39 @@ class Host < ApplicationRecord
     end
   end
 
+  # A player gives one of their own tickets to another player. The log records the
+  # giver as the actor and the recipient as the player, so it can be undone (by the
+  # giver) while it's still the latest entry.
+  def gift!(giver:, recipient:)
+    return unless giver && recipient && giver.id != recipient.id
+    return unless giver.tickets.positive?
+
+    transaction do
+      giver.update!(tickets: giver.tickets - 1)
+      recipient.update!(tickets: recipient.tickets + 1)
+      logs.create!(action: "gift", player_name: recipient.name, player_id: recipient.id,
+                   actor_player_id: giver.id, actor_name: giver.name,
+                   data: { "giver_id" => giver.id, "giver_name" => giver.name })
+    end
+  end
+
+  # Reverse the most recent gift — only while it's the latest log entry. The ticket
+  # returns from recipient to giver and the entry is removed. `by`, when given, must
+  # be the giver who made it (a player can only undo their own gift).
+  def undo_gift!(by: nil)
+    log = latest_log
+    return unless log&.action == "gift"
+    return unless by.nil? || log.actor_player_id == by.id
+
+    recipient = players.find_by(id: log.player_id)
+    giver = players.find_by(id: log.data["giver_id"])
+    transaction do
+      recipient&.update!(tickets: [ recipient.tickets - 1, 0 ].max)
+      giver&.update!(tickets: giver.tickets + 1)
+      log.destroy
+    end
+  end
+
   # Record a player deletion (call before the player is destroyed).
   def log_delete!(player)
     logs.create!(action: "delete", player_name: player.name, player_id: player.id)

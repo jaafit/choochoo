@@ -8,6 +8,12 @@
   # The single present player whose card/controls are being edited (host only).
   editing_player = (editing && @host.present_players.count == 1) ? @host.present_players.first : nil
 
+  # Gifting: a player gives tickets to the single present player (the recipient).
+  # Never a gift to oneself, so the recipient must differ from the acting player.
+  single_present = @host.present_players.count == 1 ? @host.present_players.first : nil
+  gifting   = !host_view? && params[:gifting].present? && single_present && single_present.id != current_player&.id
+  recipient = gifting ? single_present : nil
+
   # The selection controller wraps the grid + buttons only while selecting, so a
   # client-side "who's playing" choice can update the grid and the Send form.
   wrapper = selecting ? { data: {
@@ -27,27 +33,29 @@
         <%
           is_nominee = selecting && player.id == nominee.id
           is_editing = editing_player && player.id == editing_player.id
+          is_recipient = recipient && player.id == recipient.id
           in_room    = player.present?
           selectable = selecting && in_room && !is_nominee
           mine       = !host_view? && current_player&.id == player.id
 
           classes =
             if is_nominee then "bg-accent text-accent-content ring-2 ring-accent shadow-lg"
-            elsif is_editing then "bg-secondary text-secondary-content shadow-md"
+            elsif is_editing || is_recipient then "bg-secondary text-secondary-content shadow-md"
             elsif in_room then "bg-primary text-primary-content shadow-md"
             else "bg-base-100 shadow-md"
             end
 
-          # While editing, show the player's true count (before the +1 they earned
-          # for being present).
+          # While editing or receiving a gift, show the player's true count (before
+          # the +1 they earned for being present).
           tickets_display =
             if is_nominee then @host.nominee_remaining_tickets(0)
-            elsif is_editing then [ player.tickets - 1, 0 ].max
+            elsif is_editing || is_recipient then [ player.tickets - 1, 0 ].max
             else player.tickets
             end
           badge =
             if is_nominee then "picker"
             elsif is_editing then "editing"
+            elsif is_recipient then "recipient"
             elsif in_room then "present"
             end
         %>
@@ -58,7 +66,7 @@
                 classes: "#{classes} cursor-pointer select-none",
                 tickets_display: tickets_display, badge: badge, mine: mine,
                 card_data: { selection_target: "player", player_id: player.id, action: "click->selection#toggle" } %>
-        <% elsif is_nominee || is_editing %>
+        <% elsif is_nominee || is_editing || is_recipient %>
           <%= render "card", player: player, classes: classes,
                 tickets_display: tickets_display, badge: badge, ticket_target: is_nominee, mine: mine %>
         <% else %>
@@ -111,6 +119,32 @@
         </div>
       </div>
 
+    <% elsif gifting %>
+      <%# A player giving their tickets to the recipient. + gives one (from the
+          giver's supply); - undoes the last gift while it's the latest log entry. %>
+      <p class="text-2xl mb-4">Give tickets to <%= recipient.name %></p>
+      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div></div>
+        <div class="justify-self-center flex items-center gap-3">
+          <% if can_undo && @host.latest_log&.action == "gift" %>
+            <%= button_to "-", app_ungift_path(recipient), method: :patch, class: "btn" %>
+          <% else %>
+            <button type="button" class="btn btn-disabled" disabled>-</button>
+          <% end %>
+          <% if current_player.tickets.positive? %>
+            <%= button_to "+", app_gift_path(recipient), method: :patch, class: "btn" %>
+          <% else %>
+            <button type="button" class="btn btn-disabled" disabled>+</button>
+          <% end %>
+        </div>
+        <div class="justify-self-end">
+          <%# Done removes the recipient from the room, giving back the ticket they
+              earned for being present so only the gifts remain. %>
+          <%= button_to "done", app_toggle_room_path(recipient), method: :patch, class: "btn" %>
+        </div>
+      </div>
+      <p class="mt-3 text-sm opacity-70">You have <%= current_player.tickets %> tix to give.</p>
+
     <% else %>
       <% present_count = @host.present_players.count %>
       <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
@@ -124,6 +158,9 @@
             <%= link_to "edit", host_path(@host, editing: 1), class: "btn btn-outline btn-neutral" %>
           <% elsif host_view? && present_count >= 2 %>
             <%= button_to "Nominate", app_nominate_path, method: :post, class: "btn btn-primary btn-lg" %>
+          <% elsif !host_view? && present_count == 1 && single_present && single_present.id != current_player&.id %>
+            <%# Exactly one other player present: gift to them instead of nominating. %>
+            <%= link_to "Gift", app_root_path(gifting: 1), class: "btn btn-primary btn-lg" %>
           <% elsif !host_view? && present_count >= 1 %>
             <%= button_to "Nominate", app_nominate_path, method: :post, class: "btn btn-primary btn-lg" %>
           <% end %>

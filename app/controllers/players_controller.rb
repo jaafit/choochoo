@@ -1,7 +1,7 @@
 class PlayersController < ApplicationController
   before_action :set_host
   before_action :host_only!, only: [ :destroy, :adjust_tickets ]
-  before_action :set_player, only: [ :destroy, :toggle_room, :adjust_tickets ]
+  before_action :set_player, only: [ :destroy, :toggle_room, :adjust_tickets, :gift, :ungift ]
 
   # POST players — anyone with access (host or player) may add a player.
   def create
@@ -28,6 +28,18 @@ class PlayersController < ApplicationController
   def adjust_tickets
     @host.adjust_ticket!(@player, params[:amount].to_i)
     redirect_to host_path(@host, editing: 1)
+  end
+
+  # PATCH gift — the acting player gives one of their tickets to @player.
+  def gift
+    @host.gift!(giver: current_player, recipient: @player)
+    redirect_to app_root_path(gifting: 1)
+  end
+
+  # PATCH ungift — undo the acting player's most recent gift (latest log only).
+  def ungift
+    @host.undo_gift!(by: current_player)
+    redirect_to app_root_path(gifting: 1)
   end
 
   private
