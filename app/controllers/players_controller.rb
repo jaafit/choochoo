@@ -5,9 +5,13 @@ class PlayersController < ApplicationController
 
   # POST players — anyone with access (host or player) may add a player.
   def create
-    @host.players.create(player_params)
-    # `added` lets the view autofocus the input only right after an add.
-    redirect_to app_root_path(added: 1)
+    player = @host.players.create(player_params)
+    if player.persisted?
+      # `added` lets the view autofocus the input only right after an add.
+      redirect_to app_root_path(added: 1)
+    else
+      redirect_to app_root_path, alert: player.errors.full_messages.to_sentence
+    end
   end
 
   # DELETE — host only.
