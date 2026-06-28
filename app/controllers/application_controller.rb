@@ -67,15 +67,15 @@ class ApplicationController < ActionController::Base
   end
   helper_method :app_send_off_path
 
+  def app_state_path
+    host_view? ? state_host_path(@host) : player_state_path(@current_player.uuid)
+  end
+  helper_method :app_state_path
+
   def app_players_path
     host_view? ? host_players_path(@host) : player_players_path(@current_player.uuid)
   end
   helper_method :app_players_path
-
-  def app_toggle_room_path(player)
-    host_view? ? toggle_room_host_player_path(@host, player) : player_toggle_room_path(@current_player.uuid, player)
-  end
-  helper_method :app_toggle_room_path
 
   def app_gift_path(player)
     host_view? ? gift_host_player_path(@host, player) : player_gift_path(@current_player.uuid, player)

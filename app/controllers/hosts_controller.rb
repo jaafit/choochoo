@@ -1,5 +1,5 @@
 class HostsController < ApplicationController
-  before_action :set_host, only: [ :show, :update, :nominate, :undo, :send_off ]
+  before_action :set_host, only: [ :show, :state, :update, :nominate, :undo, :send_off ]
   before_action :admin_only!, only: [ :update ]
 
   # GET / — no host in the URL, so create one and put its UUID in the URL.
@@ -26,28 +26,49 @@ class HostsController < ApplicationController
     redirect_to app_root_path, alert: @host.errors.full_messages.to_sentence.presence
   end
 
-  # POST nominate — host or any player may nominate (no need to be present).
+  # GET state.json — the authoritative roster (names + ticket totals) for the
+  # client to reconcile against after a change. No round state: presence and the
+  # in-progress pick live only in the browser.
+  def state
+    render json: { roster: @host.roster_json }
+  end
+
+  # POST nominate — pick a winner among the client's present ids. Stateless: no
+  # tickets spent, no log written. Returns the winner and the fresh roster.
   def nominate
-    @host.nominate!(actor: current_player)
-    redirect_to app_root_path
+    winner = @host.pick_winner(params[:present_ids] || [])
+    render json: { winner_id: winner&.id, roster: @host.roster_json }
   end
 
-  # POST undo — host can undo the latest action; a player only their own latest.
-  def undo
-    if @host.can_undo_latest?(current_player)
-      if @host.selecting?
-        @host.cancel_nomination!
-      elsif @host.undoable_send_off?
-        @host.restore_send_off!
-      end
-    end
-    redirect_to app_root_path
-  end
-
-  # POST send_off — commit the round; selection (member_ids) comes from the client.
+  # POST send_off — commit the round from client ids: chosen + who was sent to
+  # their game. Returns the roster and the new log id (so the client can offer an
+  # immediate "undo send"). Trusts only the ids, never client ticket numbers.
   def send_off
-    @host.send_off!(params[:member_ids] || [], actor: current_player)
-    redirect_to app_root_path
+    log = @host.send_off!(params[:chosen_id], params[:member_ids] || [], actor: current_player)
+    render json: { roster: @host.roster_json, log_id: log&.id }
+  end
+
+  # POST undo — reverse the latest send-off, but only if it's still the latest
+  # log (`log_id` must match). From the home page a player may undo only their
+  # own; from the logs view an admin may undo anyone's (params[:admin]).
+  def undo
+    log = @host.latest_log
+    if log && log.id == params[:log_id].to_i && log.action == "send_off"
+      authorized = params[:admin].present? ? current_admin? : log.actor_player_id == current_player&.id
+      @host.restore_send_off!(log) if authorized
+    end
+
+    # After undoing, the now-latest action may itself be the player's own
+    # send-off — report it so the home page can offer to undo that one too.
+    latest = @host.latest_log
+    undo_log_id = (latest&.action == "send_off" && @host.can_undo_latest?(current_player)) ? latest.id : nil
+
+    respond_to do |format|
+      format.json { render json: { roster: @host.roster_json, undo_log_id: undo_log_id } }
+      # 303 so Turbo follows the redirect and re-renders the logs page, where the
+      # new latest action then shows its own undo button.
+      format.html { redirect_to(params[:admin].present? ? app_logs_path : app_root_path, status: :see_other) }
+    end
   end
 
   private

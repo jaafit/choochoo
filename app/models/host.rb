@@ -1,7 +1,6 @@
 class Host < ApplicationRecord
   has_many :players, dependent: :destroy
   has_many :logs, dependent: :destroy
-  belongs_to :nominated_player, class_name: "Player", optional: true
   # The owner is the host's first admin. One per host; can never be demoted.
   belongs_to :owner, class_name: "Player", optional: true
 
@@ -26,26 +25,13 @@ class Host < ApplicationRecord
     players.order(Arel.sql("name COLLATE NOCASE ASC"))
   end
 
-  # Players currently in the room.
-  def present_players
-    players.where(present: true)
-  end
-
-  # True once a player has been nominated: we're choosing who plays their game.
-  def selecting?
-    nominated_player_id.present?
-  end
-
-  # In-room players eligible to be marked as playing the nominee's game.
-  def selectable_players
-    present_players.where.not(id: nominated_player_id)
-  end
-
-  # Tickets the nominee will end up with: they pay 1 to be nominated plus 1 per
-  # selected player, floored at 0. `selected_count` comes from the session.
-  def nominee_remaining_tickets(selected_count)
-    return nil unless nominated_player
-    [ 0, nominated_player.tickets - 1 - selected_count ].max
+  # Player rows for the client grid: name + authoritative ticket count + flags.
+  # Presence and the in-progress round live only in the browser now, so the
+  # server never knows (or broadcasts) who is in the room or being picked.
+  def roster_json
+    roster.map do |p|
+      { id: p.id, name: p.name, tickets: p.tickets, admin: p.admin, owner: p.id == owner_id }
+    end
   end
 
   # Most recent log entry (reverse chronological by id).
@@ -53,30 +39,25 @@ class Host < ApplicationRecord
     logs.order(id: :desc).first
   end
 
-  # Weighted random pick among the players in the room (one entry per ticket).
-  # No tickets are spent yet — that happens on send-off. Logs who was present.
-  def nominate!(actor: nil)
-    pool = present_players.flat_map { |p| Array.new(p.tickets, p) }
-    return nil if pool.empty?
-
-    winner = pool.sample
-    others = present_players.where.not(id: winner.id)
-                            .order(Arel.sql("name COLLATE NOCASE ASC")).pluck(:name)
-    transaction do
-      update!(nominated_player: winner)
-      logs.create!(action: "nominate", player_name: winner.name, player_id: winner.id,
-                   actor_player_id: actor&.id, actor_name: actor&.name,
-                   data: { "others" => others })
-    end
-    winner
+  # Weighted random pick among the present players (client-supplied ids). Stateless:
+  # spends no tickets and writes no log — the round lives in the browser until
+  # send-off, which is what lets several players run a raffle at once. Weighting
+  # uses tickets + 1 so a just-arrived 0-ticket player stays pickable, matching
+  # the old post-entry pool. Reads ticket counts from the DB, never the client.
+  def pick_winner(present_ids)
+    pool = players.where(id: Array(present_ids))
+                  .flat_map { |p| Array.new([ p.tickets, 0 ].max + 1, p) }
+    pool.sample
   end
 
-  # Can the given actor (a Player) undo the latest action? An admin can undo
-  # anything; a non-admin player only their own most-recent action.
+  # Can the given actor undo the latest action from the home page? Only the
+  # player who performed it — even admins get no override here; their override
+  # lives in the logs view (see HostsController#undo with `admin`). Always
+  # limited to the single latest log entry.
   def can_undo_latest?(actor)
     log = latest_log
     return false unless log
-    actor&.admin? || log.actor_player_id == actor&.id
+    log.actor_player_id == actor&.id
   end
 
   # True once the host has at least one admin (the owner is always the first).
@@ -121,36 +102,37 @@ class Host < ApplicationRecord
     end
   end
 
-  # Cancel the current nomination (undo of a nominate): drop its log entry too.
-  def cancel_nomination!
+  # Commit a round from client-supplied ids — we never trust client ticket
+  # numbers, only the id lists. Each player sent to the chosen one's game earns
+  # +1; the chosen pays 1 per other player sent, floored at 0. Players who were
+  # merely present (not sent) are untouched. The log stores a prior-ticket
+  # snapshot of everyone changed so the round can be undone while it is still the
+  # latest log. Returns the created log, or nil if the chosen id is invalid.
+  def send_off!(chosen_id, member_ids, actor: nil)
+    log = nil
     transaction do
-      log = latest_log
-      log.destroy if log&.action == "nominate"
-      update!(nominated_player: nil)
-    end
-  end
+      chosen = players.find_by(id: chosen_id)
+      if chosen
+        ids = (Array(member_ids).map(&:to_i) - [ chosen.id ]).uniq
+        members = players.where(id: ids).order(Arel.sql("name COLLATE NOCASE ASC")).to_a
+        new_chosen = [ chosen.tickets - members.size, 0 ].max
+        snapshot = ([ chosen ] + members).to_h { |p| [ p.id.to_s, p.tickets ] }
 
-  # Commit the round: the nominee pays their tickets, then the nominee and the
-  # selected players leave the room. The send_off log entry doubles as the undo
-  # snapshot. `member_ids` is the ephemeral selection from the session.
-  def send_off!(member_ids, actor: nil)
-    return unless selecting?
-
-    nominee = nominated_player
-    members = selectable_players.where(id: member_ids).order(Arel.sql("name COLLATE NOCASE ASC")).to_a
-    new_tickets = [ 0, nominee.tickets - 1 - members.size ].max
-    transaction do
-      logs.create!(action: "send_off", player_name: nominee.name, player_id: nominee.id,
-                   actor_player_id: actor&.id, actor_name: actor&.name, data: {
-        "members" => members.map(&:name),
-        "member_ids" => members.map(&:id),
-        "delta" => new_tickets - nominee.tickets,
-        "nominee_tickets" => nominee.tickets
-      })
-      nominee.update!(tickets: new_tickets)
-      ([ nominee ] + members).each { |p| p.update!(present: false) }
-      update!(nominated_player: nil)
+        log = logs.create!(action: "send_off", player_name: chosen.name, player_id: chosen.id,
+                     actor_player_id: actor&.id, actor_name: actor&.name, data: {
+          "chosen_id" => chosen.id,
+          "members" => members.map(&:name),
+          "member_ids" => members.map(&:id),
+          "chosen_delta" => new_chosen - chosen.tickets,
+          "prior_tickets" => snapshot
+        })
+        # Atomic increments so concurrent send-offs over overlapping sets can't
+        # lose updates; the chosen's floored value is computed above.
+        players.where(id: members.map(&:id)).update_all("tickets = tickets + 1") if members.any?
+        players.where(id: chosen.id).update_all(tickets: new_chosen)
+      end
     end
+    log
   end
 
   # True when the most recent action was a send-off (so it can be undone).
@@ -158,20 +140,19 @@ class Host < ApplicationRecord
     latest_log&.action == "send_off"
   end
 
-  # Reverse the last send-off: restore the nominee's tickets, put the nominee and
-  # everyone sent off back in the room (re-nominated), and delete the log entry.
-  def restore_send_off!
-    log = latest_log
-    return unless log&.action == "send_off"
-
-    data = log.data
-    nominee = players.find_by(id: log.player_id)
+  # Reverse a send-off: restore every affected player's ticket count from the
+  # log's snapshot and delete the log. Callers verify `log` is the latest entry
+  # first, so the snapshot is still current — any later change would have created
+  # a newer log, which is exactly why undo refuses to run when it isn't latest.
+  def restore_send_off!(log)
+    return false unless log&.action == "send_off"
     transaction do
-      nominee&.update!(tickets: data["nominee_tickets"], present: true)
-      players.where(id: data["member_ids"]).update_all(present: true)
-      update!(nominated_player_id: log.player_id)
+      Hash(log.data["prior_tickets"]).each do |pid, tix|
+        players.where(id: pid).update_all(tickets: tix)
+      end
       log.destroy
     end
+    true
   end
 
   # Edit-mode +/- a ticket (floored at 0). Logging collapses inverse pairs: a

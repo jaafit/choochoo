@@ -9,6 +9,9 @@
   <% if @logs.empty? %>
     <p class="text-center opacity-70">No changes yet.</p>
   <% else %>
+    <%# Admins can undo the latest action here regardless of who did it — the only
+        place that override lives. Limited to the single latest log (send-off). %>
+    <% latest = @page == 1 ? @logs.first : nil %>
     <ul class="divide-y divide-base-300">
       <% @logs.each do |log| %>
         <li class="py-3 flex items-center gap-3">
@@ -24,8 +27,9 @@
                     notes: log.other_names.index_with { "+1 tix" } %>
             <% when "send_off" %>
               <strong><%= log.actor_label %></strong> started <strong><%= log.player_name %></strong>'s game
+              <%# Each player sent earns +1; the chosen pays per player sent. %>
               <%= render "logs/others", names: [ log.player_name ] + log.other_names, suffix: "players",
-                    notes: { log.player_name => log.net_ticket_label } %>
+                    notes: log.other_names.index_with { "+1 tix" }.merge(log.player_name => log.net_ticket_label) %>
             <% when "add" %>
               <strong><%= log.actor_label %></strong> added a ticket to <strong><%= log.player_name %></strong>
             <% when "subtract" %>
@@ -42,6 +46,11 @@
               <strong><%= log.actor_label %></strong> demoted <strong><%= log.player_name %></strong>
             <% end %>
           </div>
+          <% if current_admin? && log == latest && log.action == "send_off" %>
+            <%= button_to "undo", app_undo_path, method: :post, class: "btn btn-xs btn-ghost ml-auto shrink-0",
+                  params: { log_id: log.id, admin: true },
+                  form: { data: { turbo_confirm: "Undo this send-off?" } } %>
+          <% end %>
         </li>
       <% end %>
     </ul>

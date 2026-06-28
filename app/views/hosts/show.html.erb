@@ -1,40 +1,19 @@
 <% content_for :title, "#{@host.display_name} | someonepick.com" %>
 <%
-  selecting   = @host.selecting?
-  editing     = current_admin? && params[:editing].present?
-  nominee     = @host.nominated_player
-  can_undo    = @host.can_undo_latest?(current_player)
+  # Editing (admin) and gifting are server-rendered sub-flows focused on one
+  # player by id. The raffle itself (present → pick → who's playing → send) lives
+  # entirely in the browser via the `table` Stimulus controller; the server keeps
+  # no round state, so several players can run a raffle at the same time.
+  editing_player = current_admin? && params[:editing].present? ? @host.players.find_by(id: params[:editing]) : nil
+  gift_recipient = params[:gifting].present? ? @host.players.find_by(id: params[:gifting]) : nil
+  gifting        = !host_view? && gift_recipient && gift_recipient.id != current_player&.id
 
-  # The single present player whose card/controls are being edited (admin only).
-  editing_player = (editing && @host.present_players.count == 1) ? @host.present_players.first : nil
-
-  # Gifting: a player gives tickets to the single present player (the recipient).
-  # Never a gift to oneself, so the recipient must differ from the acting player.
-  single_present = @host.present_players.count == 1 ? @host.present_players.first : nil
-  gifting   = !host_view? && params[:gifting].present? && single_present && single_present.id != current_player&.id
-  recipient = gifting ? single_present : nil
-
-  # The "Pick" state: 2+ present players and no special mode. The Pick button
-  # plays a suspense animation cycling the present cards before nominating.
-  picking = !selecting && @host.present_players.count >= 2
-
-  # The selection controller wraps the grid + buttons only while selecting, so a
-  # client-side "who's playing" choice can update the grid and the Send form.
-  # The nominate controller wraps the grid + Pick button so the animation can
-  # cycle the present cards before the request is actually submitted.
-  wrapper =
-    if selecting
-      { data: { controller: "selection", selection_base_tickets_value: nominee.tickets } }
-    elsif picking
-      { data: { controller: "nominate" } }
-    else
-      {}
-    end
+  # Admins can share a player's link except the owner's — unless it's their own.
+  can_share = ->(player) { !(player.id == @host.owner_id && player.id != current_player&.id) }
 %>
 
 <% if current_admin? %>
-  <%# Click the heading to rename the host; Escape cancels. The form sits in the
-      same spot and is shown via the rename-host Stimulus controller. %>
+  <%# Click the heading to rename the host; Escape cancels. %>
   <div class="text-center mb-6" data-controller="rename-host">
     <h1 class="text-4xl font-bold cursor-pointer inline-block" data-rename-host-target="display"
         data-action="click->rename-host#edit" title="Click to rename"><%= @host.display_name %></h1>
@@ -51,10 +30,8 @@
 <% end %>
 
 <% if host_view? %>
-  <%# ---- Bootstrap: the host URL only mints the first admin (the owner), then
-         redirects here to the owner thereafter. Two states only. ------------- %>
+  <%# ---- Bootstrap: the host URL only mints the first admin (the owner). ----- %>
   <% if @host.players.empty? %>
-    <%# No players yet: add yourself. You become the owner (first admin). %>
     <section class="mt-8 text-center">
       <p class="text-xl mb-4">Add yourself to get started.</p>
       <%= form_with url: app_players_path, scope: :player, class: "flex flex-wrap items-center justify-center gap-3" do |f| %>
@@ -71,10 +48,8 @@
           <%= button_to claim_host_player_path(@host, player), method: :patch,
                 class: "block w-full p-0 bg-transparent border-0",
                 form: { data: { turbo_confirm: "Confirm you are #{player.name}?" } } do %>
-            <%= render "card", player: player,
-                  classes: (player.present? ? "bg-primary text-primary-content shadow-md" : "bg-base-100 shadow-md"),
-                  tickets_display: player.tickets,
-                  badge: (player.present? ? "present" : nil) %>
+            <%= render "card", player: player, classes: "bg-base-100 shadow-md",
+                  tickets_display: player.tickets, badge: nil %>
           <% end %>
         <% end %>
       </div>
@@ -84,218 +59,211 @@
     </section>
   <% end %>
 
-<% else %>
-<div <%= tag.attributes(wrapper) if wrapper.any? %>>
-
-  <%# ---- One grid, all players (at the top) ------------------------------- %>
+<% elsif editing_player %>
+  <%# ---- Admin edit controls for one focused player ----------------------- %>
+  <% p = editing_player %>
   <section class="mt-2 mb-6">
     <div class="grid grid-cols-4 gap-1.5 sm:gap-3">
       <% @host.roster.each do |player| %>
-        <%
-          is_nominee = selecting && player.id == nominee.id
-          is_editing = editing_player && player.id == editing_player.id
-          is_recipient = recipient && player.id == recipient.id
-          in_room    = player.present?
-          selectable = selecting && in_room && !is_nominee
-          mine       = !host_view? && current_player&.id == player.id
-
-          classes =
-            if is_nominee then "bg-accent text-accent-content ring-2 ring-accent shadow-lg"
-            elsif is_editing || is_recipient then "bg-secondary text-secondary-content shadow-md"
-            elsif in_room then "bg-primary text-primary-content shadow-md"
-            else "bg-base-100 shadow-md"
-            end
-
-          # While editing or receiving a gift, show the player's true count (before
-          # the +1 they earned for being present).
-          tickets_display =
-            if is_nominee then @host.nominee_remaining_tickets(0)
-            elsif is_editing || is_recipient then [ player.tickets - 1, 0 ].max
-            else player.tickets
-            end
-          badge =
-            if is_nominee then "picker"
-            elsif is_editing then "editing"
-            elsif is_recipient then "recipient"
-            elsif in_room then "present"
-            end
-        %>
-
-        <% if selectable %>
-          <%# Pure client-side toggle — no network call. %>
-          <%= render "card", player: player,
-                classes: "#{classes} cursor-pointer select-none",
-                tickets_display: tickets_display, badge: badge, mine: mine,
-                card_data: { selection_target: "player", player_id: player.id, action: "click->selection#toggle" } %>
-        <% elsif is_nominee || is_editing || is_recipient %>
-          <%= render "card", player: player, classes: classes,
-                tickets_display: tickets_display, badge: badge, ticket_target: is_nominee, mine: mine %>
-        <% else %>
-          <% cand = (picking && in_room) ? { nominate_target: "candidate", weight: player.tickets } : {} %>
-          <%= button_to app_toggle_room_path(player), method: :patch,
-                class: "block w-full p-0 bg-transparent border-0" do %>
-            <%= render "card", player: player, classes: classes,
-                  tickets_display: tickets_display, badge: badge, mine: mine, card_data: cand %>
-          <% end %>
-        <% end %>
+        <% focus = player.id == p.id %>
+        <%= render "card", player: player,
+              classes: (focus ? "bg-secondary text-secondary-content shadow-md" : "bg-base-100 shadow-md"),
+              tickets_display: player.tickets, badge: (focus ? "editing" : nil),
+              mine: (player.id == current_player&.id) %>
       <% end %>
     </div>
   </section>
 
-  <%# ---- Round actions (below the grid) ----------------------------------- %>
   <section class="text-center">
-    <% if selecting %>
-      <p class="text-2xl mb-4">Who is playing with <%= nominee.name %>?</p>
-      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <div class="justify-self-start">
-          <% if can_undo %>
-            <%= button_to "Undo pick", app_undo_path, method: :post, class: "btn btn-sm btn-ghost" %>
-          <% end %>
-        </div>
-        <div class="justify-self-center flex items-center gap-3">
-          <button type="button" class="btn btn-ghost border border-base-content/30" data-action="selection#selectAll">Select all</button>
-          <%= form_with url: app_send_off_path, method: :post do %>
-            <span data-selection-target="memberInputs"></span>
-            <%= submit_tag "Send", class: "btn btn-accent" %>
-          <% end %>
-        </div>
-        <div></div>
+    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+      <div class="justify-self-start">
+        <% unless p.admin? %>
+          <%= button_to "delete", app_player_path(p), method: :delete, class: "btn btn-error",
+                form: { data: { turbo_confirm: "Delete #{p.name}?" } } %>
+        <% end %>
       </div>
-
-    <% elsif editing && @host.present_players.count == 1 %>
-      <%# Admin edit controls for the single present player. %>
-      <% p = @host.present_players.first %>
-      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <div class="justify-self-start">
-          <%# Admins can't delete other admins — demote first. %>
-          <% unless p.admin? %>
-            <%= button_to "delete", app_player_path(p), method: :delete,
-                  class: "btn btn-error", form: { data: { turbo_confirm: "Delete #{p.name}?" } } %>
-          <% end %>
-        </div>
-        <div class="justify-self-center flex items-center gap-3">
-          <%= button_to "-", app_adjust_tickets_path(p), method: :patch, params: { amount: -1 }, class: "btn" %>
-          <%= button_to "+", app_adjust_tickets_path(p), method: :patch, params: { amount: 1 }, class: "btn" %>
-        </div>
-        <div class="justify-self-end">
-          <% if p.id == @host.owner_id %>
-            <span class="text-sm opacity-60">owner</span>
-          <% elsif p.admin? %>
-            <%= button_to "demote", app_demote_path(p), method: :patch, class: "btn btn-outline",
-                  form: { data: { turbo_confirm: "Demote #{p.name} from admin?" } } %>
-          <% else %>
-            <%= button_to "promote", app_promote_path(p), method: :patch, class: "btn btn-outline",
-                  form: { data: { turbo_confirm: "Promote #{p.name} to admin? They will be able to edit player names and ticket counts, promote/demote (except #{@host.owner&.name}), and delete non-admins." } } %>
-          <% end %>
-        </div>
+      <div class="justify-self-center flex items-center gap-3">
+        <%= button_to "-", app_adjust_tickets_path(p), method: :patch, params: { amount: -1 }, class: "btn" %>
+        <%= button_to "+", app_adjust_tickets_path(p), method: :patch, params: { amount: 1 }, class: "btn" %>
       </div>
-
-    <% elsif gifting %>
-      <%# A player giving their tickets to the recipient. + gives one (from the
-          giver's supply); - undoes the last gift while it's the latest log entry. %>
-      <p class="text-2xl mb-4">Give tickets to <%= recipient.name %></p>
-      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <div></div>
-        <div class="justify-self-center flex items-center gap-3">
-          <% if can_undo && @host.latest_log&.action == "gift" %>
-            <%= button_to "-", app_ungift_path(recipient), method: :patch, class: "btn" %>
-          <% else %>
-            <button type="button" class="btn btn-disabled" disabled>-</button>
-          <% end %>
-          <% if current_player.tickets.positive? %>
-            <%= button_to "+", app_gift_path(recipient), method: :patch, class: "btn" %>
-          <% else %>
-            <button type="button" class="btn btn-disabled" disabled>+</button>
-          <% end %>
-        </div>
-        <div class="justify-self-end">
-          <%# Done removes the recipient from the room, giving back the ticket they
-              earned for being present so only the gifts remain. %>
-          <%= button_to "done", app_toggle_room_path(recipient), method: :patch, class: "btn" %>
-        </div>
+      <div class="justify-self-end">
+        <% if p.id == @host.owner_id %>
+          <span class="text-sm opacity-60">owner</span>
+        <% elsif p.admin? %>
+          <%= button_to "demote", app_demote_path(p), method: :patch, class: "btn btn-outline",
+                form: { data: { turbo_confirm: "Demote #{p.name} from admin?" } } %>
+        <% else %>
+          <%= button_to "promote", app_promote_path(p), method: :patch, class: "btn btn-outline",
+                form: { data: { turbo_confirm: "Promote #{p.name} to admin? They will be able to edit player names and ticket counts, promote/demote (except #{@host.owner&.name}), and delete non-admins." } } %>
+        <% end %>
       </div>
-      <p class="mt-3 text-sm opacity-70">You have <%= current_player.tickets %> tix to give.</p>
-
-    <% else %>
-      <% present_count = @host.present_players.count %>
-      <% share_player = present_count == 1 ? @host.present_players.first : nil %>
-      <%# Admins can share a present player's link, but never the owner's — except
-          the owner sharing their own. %>
-      <% can_share = current_admin? && share_player &&
-           !(share_player.id == @host.owner_id && share_player.id != current_player&.id) %>
-      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <div class="justify-self-start">
-          <% if @host.undoable_send_off? && can_undo %>
-            <%= button_to "Undo send", app_undo_path, method: :post, class: "btn btn-ghost" %>
-          <% end %>
-        </div>
-        <div class="justify-self-center">
-          <% if present_count >= 2 %>
-            <%= button_to "Pick", app_nominate_path, method: :post, class: "btn btn-primary btn-lg",
-                  form: { data: { action: "submit->nominate#run" } } %>
-          <% elsif current_admin? && present_count == 1 %>
-            <%= link_to "edit", app_root_path(editing: 1), class: "btn btn-outline btn-neutral" %>
-          <% elsif !host_view? && present_count == 1 && single_present && single_present.id != current_player&.id %>
-            <%# Exactly one other player present: gift to them instead of nominating. %>
-            <%= link_to "Gift", app_root_path(gifting: 1), class: "btn btn-primary btn-lg" %>
-          <% end %>
-        </div>
-        <div class="justify-self-end">
-          <% if can_share %>
-            <label for="share_modal" class="btn btn-outline btn-neutral">share</label>
-          <% end %>
-        </div>
-      </div>
-
-      <% if can_share %>
-        <% p = share_player %>
-        <% link = player_url(p.uuid) %>
-        <input type="checkbox" id="share_modal" class="modal-toggle" />
-        <div class="modal" role="dialog">
-          <div class="modal-box text-center">
-            <h3 class="text-lg font-bold mb-3"><%= p.name %>'s link</h3>
-            <div class="mx-auto w-56 bg-white p-3 rounded"><%= qr_svg(link) %></div>
-            <p class="mt-3 text-sm break-all"><%= link_to link, link, target: "_blank", rel: "noopener", class: "link link-primary" %></p>
-            <% if p.admin? && p.id == current_player&.id %>
-              <p class="mt-2 text-sm text-warning">Anyone with this link can take actions in your name.  If you want to share admin privileges with another person, click their player button and promote them to admin, then share their link.</p>
-            <% elsif p.admin? %>
-              <p class="mt-2 text-sm text-warning">Anyone with this link can act as <%= p.name %>, taking any admin-level action.  Logs will show their actions under <%= p.name %>'s name.  Demote <%= p.name %> to revoke admin access.</p>
-            <% else %>
-              <p class="mt-2 text-sm text-base-content/70">Anyone with this link can add players, pick pickers, mark them as playing, and gift <%= p.name %>'s tickets.  Logs will show their actions under <%= p.name %>'s name.  Delete <%= p.name %> to revoke access.</p>
-            <% end %>
-            <div class="modal-action justify-center">
-              <label for="share_modal" class="btn">Close</label>
-            </div>
-          </div>
-          <label class="modal-backdrop" for="share_modal">Close</label>
-        </div>
-      <% end %>
-    <% end %>
+    </div>
   </section>
-</div>
 
-<%# ---- Add / edit player --------------------------------------------------- %>
-<section class="mt-8">
-  <% if editing_player %>
-    <%# Editing: the input holds the player's current name; "Done" (where "Add"
-        sits) saves it and then leaves the room (giving back the present ticket). %>
-    <%= form_with url: app_player_path(editing_player), method: :patch,
-          scope: :player, class: "flex flex-wrap items-center gap-3" do |f| %>
-      <%= f.text_field :name, value: editing_player.name, autocomplete: "off",
+  <%# Edit the focused player's name; "Done" saves and returns to the table. %>
+  <section class="mt-8">
+    <%= form_with url: app_player_path(p), method: :patch, scope: :player,
+          class: "flex flex-wrap items-center gap-3" do |f| %>
+      <%= f.text_field :name, value: p.name, autocomplete: "off",
             autofocus: true, maxlength: 12, class: "input input-bordered" %>
       <%= f.submit "Done", class: "btn btn-primary" %>
     <% end %>
-  <% else %>
-    <%= form_with url: app_players_path, scope: :player, class: "flex flex-wrap items-center gap-3" do |f| %>
-      <%= f.text_field :name, placeholder: "Someone's name", autocomplete: "off",
-            autofocus: params[:added].present?, maxlength: 12, class: "input input-bordered" %>
-      <%= f.submit "+", class: "btn btn-secondary" %>
-    <% end %>
-  <% end %>
-</section>
+  </section>
 
-<%# ---- Log ---------------------------------------------------------------- %>
-<section class="mt-10 text-center">
-  <%= link_to "Show log", app_logs_path, class: "btn btn-ghost btn-sm" %>
-</section>
+<% elsif gifting %>
+  <%# ---- Give tickets to one recipient ------------------------------------ %>
+  <% r = gift_recipient %>
+  <section class="mt-2 mb-6">
+    <div class="grid grid-cols-4 gap-1.5 sm:gap-3">
+      <% @host.roster.each do |player| %>
+        <% focus = player.id == r.id %>
+        <%= render "card", player: player,
+              classes: (focus ? "bg-secondary text-secondary-content shadow-md" : "bg-base-100 shadow-md"),
+              tickets_display: player.tickets, badge: (focus ? "recipient" : nil),
+              mine: (player.id == current_player&.id) %>
+      <% end %>
+    </div>
+  </section>
+
+  <section class="text-center">
+    <p class="text-2xl mb-4">Give tickets to <%= r.name %></p>
+    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+      <div></div>
+      <div class="justify-self-center flex items-center gap-3">
+        <% if @host.can_undo_latest?(current_player) && @host.latest_log&.action == "gift" %>
+          <%= button_to "-", app_ungift_path(r), method: :patch, class: "btn" %>
+        <% else %>
+          <button type="button" class="btn btn-disabled" disabled>-</button>
+        <% end %>
+        <% if current_player.tickets.positive? %>
+          <%= button_to "+", app_gift_path(r), method: :patch, class: "btn" %>
+        <% else %>
+          <button type="button" class="btn btn-disabled" disabled>+</button>
+        <% end %>
+      </div>
+      <div class="justify-self-end">
+        <%= link_to "done", app_root_path, class: "btn" %>
+      </div>
+    </div>
+    <p class="mt-3 text-sm opacity-70">You have <%= current_player.tickets %> tix to give.</p>
+  </section>
+
+<% else %>
+  <%# ---- The table: client-side raffle ------------------------------------ %>
+  <% last_log = @host.latest_log %>
+  <% last_send_id = (last_log&.action == "send_off" && @host.can_undo_latest?(current_player)) ? last_log.id : nil %>
+  <div data-controller="table"
+       data-table-nominate-url-value="<%= app_nominate_path %>"
+       data-table-send-url-value="<%= app_send_off_path %>"
+       data-table-undo-url-value="<%= app_undo_path %>"
+       data-table-base-value="<%= app_root_path %>"
+       data-table-my-id-value="<%= current_player&.id %>"
+       data-table-admin-value="<%= current_admin? %>"
+       data-table-last-send-log-value="<%= last_send_id %>">
+
+    <section class="mt-2 mb-6">
+      <div class="grid grid-cols-4 gap-1.5 sm:gap-3">
+        <% @host.roster.each do |player| %>
+          <button type="button" class="block w-full p-0 bg-transparent border-0 cursor-pointer select-none"
+                  data-table-target="card" data-action="click->table#tapCard"
+                  data-player-id="<%= player.id %>" data-tickets="<%= player.tickets %>"
+                  data-name="<%= player.name %>" data-owner="<%= player.id == @host.owner_id %>">
+            <div class="card h-full transition-shadow bg-base-100 shadow-md">
+              <div class="card-body items-center text-center p-1.5 gap-0.5">
+                <span class="badge badge-xs invisible">·</span>
+                <span class="text-xs <%= player.id == current_player&.id ? "italic font-bold" : "font-semibold" %> <%= "underline" if player.admin? %> leading-tight break-words"><%= player.name %></span>
+                <span class="text-[0.65rem] opacity-70 js-tickets"><%= player.tickets %></span>
+              </div>
+            </div>
+          </button>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="text-center">
+      <%# Selecting: who is playing the chosen one's game? %>
+      <div data-table-target="selectArea" class="hidden">
+        <p class="text-2xl mb-4">Who is playing with <span data-table-target="nomineeName"></span>?</p>
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <div class="justify-self-start">
+            <button type="button" class="btn btn-sm btn-ghost" data-action="table#undoPick">Undo pick</button>
+          </div>
+          <div class="justify-self-center flex items-center gap-3">
+            <button type="button" class="btn btn-ghost border border-base-content/30" data-action="table#selectAll">Select all</button>
+            <button type="button" class="btn btn-accent" data-action="table#send">Send</button>
+          </div>
+          <div></div>
+        </div>
+      </div>
+
+      <%# Idle: pick / edit / gift, with undo-send on the left after a send. %>
+      <div data-table-target="idleArea">
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <div class="justify-self-start">
+            <span data-table-target="undoSendArea" class="hidden">
+              <button type="button" class="btn btn-ghost" data-action="table#undoSend">Undo send</button>
+            </span>
+          </div>
+          <div class="justify-self-center">
+            <span data-table-target="pickArea" class="hidden">
+              <button type="button" class="btn btn-primary btn-lg" data-action="table#pick">Pick</button>
+            </span>
+            <span data-table-target="editArea" class="hidden">
+              <a data-table-target="editLink" href="#" class="btn btn-outline btn-neutral">edit</a>
+            </span>
+            <span data-table-target="giftArea" class="hidden">
+              <a data-table-target="giftLink" href="#" class="btn btn-primary btn-lg">Gift</a>
+            </span>
+          </div>
+          <div class="justify-self-end">
+            <span data-table-target="shareArea" class="hidden">
+              <button type="button" class="btn btn-outline btn-neutral" data-action="table#share">share</button>
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <%# Hidden share popups, one per shareable player; the share button opens the
+        one for the single present player (see table_controller#share). %>
+    <% if current_admin? %>
+      <% @host.roster.each do |player| %>
+        <% next unless can_share.call(player) %>
+        <% link = player_url(player.uuid) %>
+        <dialog id="share-modal-<%= player.id %>" class="modal">
+          <div class="modal-box text-center">
+            <h3 class="text-lg font-bold mb-3"><%= player.name %>'s link</h3>
+            <div class="mx-auto w-56 bg-white p-3 rounded"><%= qr_svg(link) %></div>
+            <p class="mt-3 text-sm break-all"><%= link_to link, link, target: "_blank", rel: "noopener", class: "link link-primary" %></p>
+            <% if player.admin? && player.id == current_player&.id %>
+              <p class="mt-2 text-sm text-warning">Anyone with this link can take actions in your name.  If you want to share admin privileges with another person, click their player button and promote them to admin, then share their link.</p>
+            <% elsif player.admin? %>
+              <p class="mt-2 text-sm text-warning">Anyone with this link can act as <%= player.name %>, taking any admin-level action.  Logs will show their actions under <%= player.name %>'s name.  Demote <%= player.name %> to revoke admin access.</p>
+            <% else %>
+              <p class="mt-2 text-sm text-base-content/70">Anyone with this link can add players, pick pickers, mark them as playing, and gift <%= player.name %>'s tickets.  Logs will show their actions under <%= player.name %>'s name.  Delete <%= player.name %> to revoke access.</p>
+            <% end %>
+            <div class="modal-action justify-center"><form method="dialog"><button class="btn">Close</button></form></div>
+          </div>
+          <form method="dialog" class="modal-backdrop"><button aria-label="Close">close</button></form>
+        </dialog>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>
+
+<% unless host_view? %>
+  <%# ---- Add a player (hidden in edit mode, which shows the rename form) --- %>
+  <% unless editing_player %>
+    <section class="mt-8">
+      <%= form_with url: app_players_path, scope: :player, class: "flex flex-wrap items-center gap-3" do |f| %>
+        <%= f.text_field :name, placeholder: "Someone's name", autocomplete: "off",
+              autofocus: params[:added].present?, maxlength: 12, class: "input input-bordered" %>
+        <%= f.submit "+", class: "btn btn-secondary" %>
+      <% end %>
+    </section>
+  <% end %>
+
+  <section class="mt-10 text-center">
+    <%= link_to "Show log", app_logs_path, class: "btn btn-ghost btn-sm" %>
+  </section>
 <% end %>

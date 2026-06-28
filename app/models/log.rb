@@ -16,14 +16,11 @@ class Log < ApplicationRecord
     actor_name.presence || "Admin"
   end
 
-  def ticket_delta
-    data["delta"]
-  end
-
-  # Net ticket change over the whole transaction: the send-off deduction plus the
-  # +1 the nominee earned by being present. Holds whether or not the deduction was
-  # clamped at 0 (see derivation: net == delta + 1 in both cases).
+  # Net ticket change applied to the chosen player on a send-off. New logs store
+  # the exact applied delta as "chosen_delta"; older logs derive it from the
+  # legacy "delta" (deduction) plus the +1 the nominee earned for being present.
   def net_ticket_delta
+    return data["chosen_delta"] if data.key?("chosen_delta")
     d = data["delta"]
     d && d + 1
   end
