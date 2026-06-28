@@ -21,8 +21,8 @@
           <span class="js-date"><%= log.created_at.strftime("%b %-d, %Y") %></span>
           <span class="js-time text-xs"></span>
         </span>
-        <span class="text-xs font-medium whitespace-nowrap w-28 shrink-0 truncate" title="<%= log.host.display_name %>">
-          <%= log.host.display_name %>
+        <span class="text-xs font-medium whitespace-nowrap w-28 shrink-0 truncate" title="<%= log.host.id %>: <%= log.host.display_name %>">
+          <%= log.host.id %>: <%= log.host.display_name %>
         </span>
         <div class="text-left">
           <%= render "logs/entry", log: log %>
