@@ -51,3 +51,6 @@ end
 
 # QR codes for player share links
 gem "rqrcode"
+
+# Throttle abusive request rates [https://github.com/rack/rack-attack]
+gem "rack-attack", require: "rack/attack"
