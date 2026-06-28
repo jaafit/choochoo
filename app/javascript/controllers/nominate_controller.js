@@ -1,10 +1,11 @@
 import { Controller } from "@hotwired/stimulus"
 
 // Suspense animation for the Pick button. When Pick is submitted we hold the
-// request, cycle the orange "picker" highlight across all present players for
-// ~2 seconds (starting at 150ms per player, each step 10% faster), then let the
-// nominate request go through and the real result render. The animation is pure
-// showmanship — which card lands last is not tied to who actually gets picked.
+// request, hop the orange "picker" highlight from card to card for ~2 seconds,
+// then let the nominate request go through and the real result render. Each hop
+// lands on a ticket-weighted random player, never the one currently lit (so the
+// highlight always visibly moves). The animation is pure showmanship — which
+// card lands last is not tied to who actually gets picked.
 export default class extends Controller {
   static targets = ["candidate"]
 
@@ -22,25 +23,41 @@ export default class extends Controller {
 
   spin(form) {
     const cards = this.candidateTargets
-    let i = 0
-    let delay = 250
+    let current = null
+    let delay = 200
     let elapsed = 0
     // 10% faster each step quickly converges, so floor the delay to keep the
-    // highlight visibly cycling for the full two seconds before it stops.
+    // highlight visibly hopping for the full two seconds before it stops.
     const minDelay = 30
 
     const tick = () => {
-      this.highlight(cards[i % cards.length])
-      i += 1
-      if (elapsed >= 2000) {
+      current = this.pickNext(cards, current)
+      this.highlight(current)
+      if (elapsed >= 2500) {
         form.requestSubmit()
         return
       }
       this.timer = setTimeout(tick, delay)
       elapsed += delay
-      delay = Math.max(minDelay, delay * 0.90)
+      delay = Math.max(minDelay, delay * 0.95)
     }
     tick()
+  }
+
+  // A ticket-weighted random card, excluding the one currently highlighted so the
+  // highlight always moves. Falls back to the full set if exclusion empties it.
+  pickNext(cards, current) {
+    const pool = cards.filter((c) => c !== current)
+    const choices = pool.length ? pool : cards
+    const weight = (c) => Math.max(1, Number(c.dataset.weight) || 1)
+    const total = choices.reduce((sum, c) => sum + weight(c), 0)
+
+    let roll = Math.random() * total
+    for (const c of choices) {
+      roll -= weight(c)
+      if (roll < 0) return c
+    }
+    return choices[choices.length - 1]
   }
 
   // Cancel the loop on any teardown (Turbo navigation when Pick is skipped or a

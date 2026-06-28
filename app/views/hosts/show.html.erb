@@ -131,7 +131,7 @@
           <%= render "card", player: player, classes: classes,
                 tickets_display: tickets_display, badge: badge, ticket_target: is_nominee, mine: mine %>
         <% else %>
-          <% cand = (picking && in_room) ? { nominate_target: "candidate" } : {} %>
+          <% cand = (picking && in_room) ? { nominate_target: "candidate", weight: player.tickets } : {} %>
           <%= button_to app_toggle_room_path(player), method: :patch,
                 class: "block w-full p-0 bg-transparent border-0" do %>
             <%= render "card", player: player, classes: classes,
