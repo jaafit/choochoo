@@ -153,7 +153,8 @@
 <% else %>
   <%# ---- The table: client-side raffle ------------------------------------ %>
   <% last_log = @host.latest_log %>
-  <% last_send_id = (last_log&.action == "send_off" && @host.can_undo_latest?(current_player)) ? last_log.id : nil %>
+  <% last_send = (last_log&.action == "send_off" && @host.can_undo_latest?(current_player)) ? last_log : nil %>
+  <% last_send_id = last_send&.id %>
   <div data-controller="table"
        data-table-nominate-url-value="<%= app_nominate_path %>"
        data-table-send-url-value="<%= app_send_off_path %>"
@@ -161,7 +162,8 @@
        data-table-base-value="<%= app_root_path %>"
        data-table-my-id-value="<%= current_player&.id %>"
        data-table-admin-value="<%= current_admin? %>"
-       data-table-last-send-log-value="<%= last_send_id %>">
+       data-table-last-send-log-value="<%= last_send_id %>"
+       data-table-last-send-name-value="<%= last_send&.player_name %>">
 
     <section class="mt-2 mb-6">
       <div class="grid grid-cols-4 gap-1.5 sm:gap-3">
@@ -203,7 +205,7 @@
         <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <div class="justify-self-start">
             <span data-table-target="undoSendArea" class="hidden">
-              <button type="button" class="btn btn-ghost" data-action="table#undoSend">Undo send</button>
+              <button type="button" class="btn btn-ghost transition-opacity" data-action="table#undoSend" data-table-target="undoSendButton">Undo send</button>
             </span>
           </div>
           <div class="justify-self-center">

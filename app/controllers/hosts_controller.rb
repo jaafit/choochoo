@@ -59,12 +59,13 @@ class HostsController < ApplicationController
     end
 
     # After undoing, the now-latest action may itself be the player's own
-    # send-off — report it so the home page can offer to undo that one too.
+    # send-off — report it (with the picker's name) so the home page can offer to
+    # undo that one too, labelled so each successive undo visibly changes.
     latest = @host.latest_log
-    undo_log_id = (latest&.action == "send_off" && @host.can_undo_latest?(current_player)) ? latest.id : nil
+    undo_log = (latest&.action == "send_off" && @host.can_undo_latest?(current_player)) ? latest : nil
 
     respond_to do |format|
-      format.json { render json: { roster: @host.roster_json, undo_log_id: undo_log_id } }
+      format.json { render json: { roster: @host.roster_json, undo_log_id: undo_log&.id, undo_log_name: undo_log&.player_name } }
       # 303 so Turbo follows the redirect and re-renders the logs page, where the
       # new latest action then shows its own undo button.
       format.html { redirect_to(params[:admin].present? ? app_logs_path : app_root_path, status: :see_other) }

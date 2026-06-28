@@ -10,12 +10,12 @@ import { Controller } from "@hotwired/stimulus"
 // roster, which we reconcile into the grid; there is no background polling.
 export default class extends Controller {
   static targets = [
-    "card", "idleArea", "selectArea", "pickArea", "undoSendArea",
+    "card", "idleArea", "selectArea", "pickArea", "undoSendArea", "undoSendButton",
     "editArea", "giftArea", "shareArea", "editLink", "giftLink", "nomineeName"
   ]
   static values = {
     nominateUrl: String, sendUrl: String, undoUrl: String,
-    myId: Number, admin: Boolean, lastSendLog: Number, base: String
+    myId: Number, admin: Boolean, lastSendLog: Number, lastSendName: String, base: String
   }
 
   accent = ["bg-accent", "text-accent-content", "ring-2", "ring-accent", "shadow-lg"]
@@ -28,6 +28,7 @@ export default class extends Controller {
     this.phase = "idle"            // idle | spinning | selecting
     this.winnerId = null
     this.sendLogId = this.lastSendLogValue || null
+    this.sendName = this.lastSendNameValue || ""
     this.render()
   }
 
@@ -79,6 +80,7 @@ export default class extends Controller {
     if (!data) return
     this.applyRoster(data.roster)
     this.sendLogId = data.log_id || null
+    this.sendName = this.nameFor(this.winnerId)
     // The picker and the players who played leave the room; anyone else who was
     // present stays selected, ready for the next round.
     this.playing.forEach((id) => this.present.delete(id))
@@ -95,9 +97,13 @@ export default class extends Controller {
     if (!data) return
     this.applyRoster(data.roster)
     // The server tells us whether the now-latest action is the player's own
-    // send-off, so we keep offering "Undo send" for that one if so.
+    // send-off, so we keep offering to undo that one too. The label carries the
+    // picker's name, and we pulse the button so a back-to-back undo of two games
+    // with the same picker still reads as "something happened".
     this.sendLogId = data.undo_log_id || null
+    this.sendName = data.undo_log_name || ""
     this.render()
+    this.pulseUndo()
   }
 
   // --- pick animation -------------------------------------------------------
@@ -154,6 +160,10 @@ export default class extends Controller {
     const one = this.present.size === 1 ? [...this.present][0] : null
     this.toggle(this.pickAreaTarget, this.present.size >= 2)
     this.toggle(this.undoSendAreaTarget, !!this.sendLogId)
+    if (this.sendLogId && this.hasUndoSendButtonTarget) {
+      this.undoSendButtonTarget.textContent =
+        this.sendName ? `Undo ${this.sendName}'s game` : "Undo send"
+    }
 
     // Other admins can edit anyone except the owner; only the owner edits the owner.
     const showEdit = this.adminValue && one != null && !(this.isOwner(one) && !this.isOwner(this.myIdValue))
@@ -165,6 +175,15 @@ export default class extends Controller {
     this.toggle(this.shareAreaTarget, showShare)
     if (showEdit) this.editLinkTarget.href = `${this.baseValue}?editing=${one}`
     if (showGift) this.giftLinkTarget.href = `${this.baseValue}?gifting=${one}`
+  }
+
+  // Brief fade so an undo that leaves the button in place (next action is also an
+  // undoable send) still gives visible feedback.
+  pulseUndo() {
+    if (!this.sendLogId || !this.hasUndoSendButtonTarget) return
+    const btn = this.undoSendButtonTarget
+    btn.classList.add("opacity-40")
+    setTimeout(() => btn.classList.remove("opacity-40"), 150)
   }
 
   // Open the pre-rendered popup for the single present player.
