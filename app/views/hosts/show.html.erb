@@ -1,11 +1,11 @@
 <% content_for :title, "Someone Pick" %>
 <%
   selecting   = @host.selecting?
-  editing     = host_view? && params[:editing].present?
+  editing     = current_admin? && params[:editing].present?
   nominee     = @host.nominated_player
   can_undo    = @host.can_undo_latest?(current_player)
 
-  # The single present player whose card/controls are being edited (host only).
+  # The single present player whose card/controls are being edited (admin only).
   editing_player = (editing && @host.present_players.count == 1) ? @host.present_players.first : nil
 
   # Gifting: a player gives tickets to the single present player (the recipient).
@@ -34,6 +34,41 @@
 
 <h1 class="text-4xl font-bold text-center mb-6">Someone Pick</h1>
 
+<% if host_view? %>
+  <%# ---- Bootstrap: the host URL only mints the first admin (the owner), then
+         redirects here to the owner thereafter. Two states only. ------------- %>
+  <% if @host.players.empty? %>
+    <%# No players yet: add yourself. You become the owner (first admin). %>
+    <section class="mt-8 text-center">
+      <p class="text-xl mb-4">Add yourself to get started.</p>
+      <%= form_with url: app_players_path, scope: :player, class: "flex flex-wrap items-center justify-center gap-3" do |f| %>
+        <%= f.text_field :name, placeholder: "Your name", autocomplete: "off",
+              autofocus: true, maxlength: 12, class: "input input-bordered" %>
+        <%= f.submit "Add", class: "btn btn-primary" %>
+      <% end %>
+    </section>
+  <% else %>
+    <%# Players exist but nobody is an admin yet: claim which one you are. %>
+    <section class="mt-2 mb-6">
+      <div class="grid grid-cols-4 gap-1.5 sm:gap-3">
+        <% @host.roster.each do |player| %>
+          <%= button_to claim_host_player_path(@host, player), method: :patch,
+                class: "block w-full p-0 bg-transparent border-0",
+                form: { data: { turbo_confirm: "Confirm you are #{player.name}?" } } do %>
+            <%= render "card", player: player,
+                  classes: (player.present? ? "bg-primary text-primary-content shadow-md" : "bg-base-100 shadow-md"),
+                  tickets_display: player.tickets,
+                  badge: (player.present? ? "present" : nil) %>
+          <% end %>
+        <% end %>
+      </div>
+    </section>
+    <section class="text-center">
+      <p class="text-2xl">Which player are you?</p>
+    </section>
+  <% end %>
+
+<% else %>
 <div <%= tag.attributes(wrapper) if wrapper.any? %>>
 
   <%# ---- One grid, all players (at the top) ------------------------------- %>
@@ -112,18 +147,31 @@
       </div>
 
     <% elsif editing && @host.present_players.count == 1 %>
-      <%# Host edit controls for the single present player. %>
+      <%# Admin edit controls for the single present player. %>
       <% p = @host.present_players.first %>
       <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div class="justify-self-start">
-          <%= button_to "delete", host_player_path(@host, p), method: :delete,
-                class: "btn btn-error", form: { data: { turbo_confirm: "Delete #{p.name}?" } } %>
+          <%# Admins can't delete other admins — demote first. %>
+          <% unless p.admin? %>
+            <%= button_to "delete", app_player_path(p), method: :delete,
+                  class: "btn btn-error", form: { data: { turbo_confirm: "Delete #{p.name}?" } } %>
+          <% end %>
         </div>
         <div class="justify-self-center flex items-center gap-3">
-          <%= button_to "-", adjust_tickets_host_player_path(@host, p, amount: -1), method: :patch, class: "btn" %>
-          <%= button_to "+", adjust_tickets_host_player_path(@host, p, amount: 1), method: :patch, class: "btn" %>
+          <%= button_to "-", app_adjust_tickets_path(p), method: :patch, params: { amount: -1 }, class: "btn" %>
+          <%= button_to "+", app_adjust_tickets_path(p), method: :patch, params: { amount: 1 }, class: "btn" %>
         </div>
-        <div></div>
+        <div class="justify-self-end">
+          <% if p.id == @host.owner_id %>
+            <span class="text-sm opacity-60">owner</span>
+          <% elsif p.admin? %>
+            <%= button_to "demote", app_demote_path(p), method: :patch, class: "btn btn-outline",
+                  form: { data: { turbo_confirm: "Demote #{p.name} from admin?" } } %>
+          <% else %>
+            <%= button_to "promote", app_promote_path(p), method: :patch, class: "btn btn-outline",
+                  form: { data: { turbo_confirm: "Promote #{p.name} to admin? They will be able to edit player names and ticket counts, promote/demote (except #{@host.owner&.name}), and delete non-admins." } } %>
+          <% end %>
+        </div>
       </div>
 
     <% elsif gifting %>
@@ -164,21 +212,21 @@
           <% if present_count >= 2 %>
             <%= button_to "Pick", app_nominate_path, method: :post, class: "btn btn-primary btn-lg",
                   form: { data: { action: "submit->nominate#run" } } %>
-          <% elsif host_view? && present_count == 1 %>
-            <%= link_to "edit", host_path(@host, editing: 1), class: "btn btn-outline btn-neutral" %>
+          <% elsif current_admin? && present_count == 1 %>
+            <%= link_to "edit", app_root_path(editing: 1), class: "btn btn-outline btn-neutral" %>
           <% elsif !host_view? && present_count == 1 && single_present && single_present.id != current_player&.id %>
             <%# Exactly one other player present: gift to them instead of nominating. %>
             <%= link_to "Gift", app_root_path(gifting: 1), class: "btn btn-primary btn-lg" %>
           <% end %>
         </div>
         <div class="justify-self-end">
-          <% if host_view? && present_count == 1 %>
+          <% if current_admin? && present_count == 1 %>
             <label for="share_modal" class="btn btn-outline btn-neutral">share</label>
           <% end %>
         </div>
       </div>
 
-      <% if host_view? && present_count == 1 %>
+      <% if current_admin? && present_count == 1 %>
         <% p = @host.present_players.first %>
         <% link = player_url(p.uuid) %>
         <input type="checkbox" id="share_modal" class="modal-toggle" />
@@ -186,7 +234,7 @@
           <div class="modal-box text-center">
             <h3 class="text-lg font-bold mb-3"><%= p.name %>'s link</h3>
             <div class="mx-auto w-56 bg-white p-3 rounded"><%= qr_svg(link) %></div>
-            <p class="mt-3 text-sm break-all"><%= link %></p>
+            <p class="mt-3 text-sm break-all"><%= link_to link, link, target: "_blank", rel: "noopener", class: "link link-primary" %></p>
             <p class="mt-2 text-sm text-base-content/70">Anyone with this link can add players, pick pickers, mark them as playing, and gift <%= p.name %>'s tickets.  Logs will show their actions under <%= p.name %>'s name.  Delete <%= p.name %> to revoke access.</p>
             <div class="modal-action justify-center">
               <label for="share_modal" class="btn">Close</label>
@@ -199,12 +247,12 @@
   </section>
 </div>
 
-<%# ---- Add / edit player -------------------------------------------------- %>
+<%# ---- Add / edit player --------------------------------------------------- %>
 <section class="mt-8">
   <% if editing_player %>
     <%# Editing: the input holds the player's current name; "Done" (where "Add"
         sits) saves it and then leaves the room (giving back the present ticket). %>
-    <%= form_with url: host_player_path(@host, editing_player), method: :patch,
+    <%= form_with url: app_player_path(editing_player), method: :patch,
           scope: :player, class: "flex flex-wrap items-center gap-3" do |f| %>
       <%= f.text_field :name, value: editing_player.name, autocomplete: "off",
             autofocus: true, maxlength: 12, class: "input input-bordered" %>
@@ -223,3 +271,4 @@
 <section class="mt-10 text-center">
   <%= link_to "Show log", app_logs_path, class: "btn btn-ghost btn-sm" %>
 </section>
+<% end %>

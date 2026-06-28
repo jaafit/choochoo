@@ -2,6 +2,8 @@ class Host < ApplicationRecord
   has_many :players, dependent: :destroy
   has_many :logs, dependent: :destroy
   belongs_to :nominated_player, class_name: "Player", optional: true
+  # The owner is the host's first admin. One per host; can never be demoted.
+  belongs_to :owner, class_name: "Player", optional: true
 
   before_create :assign_uuid
 
@@ -61,12 +63,50 @@ class Host < ApplicationRecord
     winner
   end
 
-  # Can the given actor (a Player, or nil for the host) undo the latest action?
-  # The host can undo anything; a player only their own most-recent action.
+  # Can the given actor (a Player) undo the latest action? An admin can undo
+  # anything; a non-admin player only their own most-recent action.
   def can_undo_latest?(actor)
     log = latest_log
     return false unless log
-    actor.nil? || log.actor_player_id == actor.id
+    actor&.admin? || log.actor_player_id == actor&.id
+  end
+
+  # True once the host has at least one admin (the owner is always the first).
+  def has_admin?
+    owner_id.present?
+  end
+
+  # Make the player the host's owner: its first admin. Used when the first player
+  # adds themselves, or when someone claims a player on an admin-less host.
+  def make_owner!(player)
+    transaction do
+      player.update!(admin: true)
+      update!(owner: player)
+    end
+  end
+
+  # Promote a player to admin. `by` is the acting admin (recorded in the log).
+  def promote!(player, by:)
+    return if player.admin?
+
+    transaction do
+      player.update!(admin: true)
+      logs.create!(action: "promote", player_name: player.name, player_id: player.id,
+                   actor_player_id: by&.id, actor_name: by&.name)
+    end
+  end
+
+  # Demote a non-owner admin back to a regular player. The owner can never be
+  # demoted. `by` is the acting admin (recorded in the log).
+  def demote!(player, by:)
+    return unless player.admin?
+    return if player.id == owner_id
+
+    transaction do
+      player.update!(admin: false)
+      logs.create!(action: "demote", player_name: player.name, player_id: player.id,
+                   actor_player_id: by&.id, actor_name: by&.name)
+    end
   end
 
   # Cancel the current nomination (undo of a nominate): drop its log entry too.
@@ -124,7 +164,7 @@ class Host < ApplicationRecord
 
   # Edit-mode +/- a ticket (floored at 0). Logging collapses inverse pairs: a
   # subtract right after an add (same player) just deletes the add, and vice versa.
-  def adjust_ticket!(player, amount)
+  def adjust_ticket!(player, amount, actor: nil)
     new_tickets = [ 0, player.tickets + amount ].max
     return if new_tickets == player.tickets
 
@@ -136,7 +176,8 @@ class Host < ApplicationRecord
       if last && last.action == inverse && last.player_id == player.id
         last.destroy
       else
-        logs.create!(action: this_action, player_name: player.name, player_id: player.id)
+        logs.create!(action: this_action, player_name: player.name, player_id: player.id,
+                     actor_player_id: actor&.id, actor_name: actor&.name)
       end
     end
   end
@@ -174,9 +215,18 @@ class Host < ApplicationRecord
     end
   end
 
-  # Record a player deletion (call before the player is destroyed).
-  def log_delete!(player)
-    logs.create!(action: "delete", player_name: player.name, player_id: player.id)
+  # Record that `actor` added `player` to the roster. (The first player — the
+  # owner, added during bootstrap — isn't logged; see PlayersController#create.)
+  def log_add!(player, actor: nil)
+    logs.create!(action: "add_player", player_name: player.name, player_id: player.id,
+                 actor_player_id: actor&.id, actor_name: actor&.name)
+  end
+
+  # Record a player deletion (call before the player is destroyed). `actor` is the
+  # admin who deleted them.
+  def log_delete!(player, actor: nil)
+    logs.create!(action: "delete", player_name: player.name, player_id: player.id,
+                 actor_player_id: actor&.id, actor_name: actor&.name)
   end
 
   private

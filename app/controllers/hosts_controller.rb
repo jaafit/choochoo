@@ -8,7 +8,12 @@ class HostsController < ApplicationController
   end
 
   # GET /hosts/:uuid  or  /player/:player_uuid
+  #
+  # Once the host has an owner, the host URL is no longer a control surface — it
+  # redirects to the owner's player URL. Before that it bootstraps the first admin
+  # (add-yourself, or "Which player are you?"); see the view.
   def show
+    redirect_to player_path(@host.owner.uuid) if host_view? && @host.owner
   end
 
   # POST nominate — host or any player may nominate (no need to be present).

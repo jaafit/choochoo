@@ -1,34 +1,60 @@
 class PlayersController < ApplicationController
   before_action :set_host
-  before_action :host_only!, only: [ :destroy, :update, :adjust_tickets ]
-  before_action :set_player, only: [ :destroy, :update, :toggle_room, :adjust_tickets, :gift, :ungift ]
+  before_action :admin_only!, only: [ :destroy, :update, :adjust_tickets, :promote, :demote ]
+  before_action :set_player, only: [ :destroy, :update, :toggle_room, :adjust_tickets,
+                                     :gift, :ungift, :promote, :demote, :claim ]
 
-  # POST players — anyone with access (host or player) may add a player.
+  # POST players — anyone with access (host or player) may add a player. Adding the
+  # very first player (only reachable from the host URL) makes them the owner — the
+  # first admin — and drops them into their own player URL.
   def create
+    first = @host.players.empty?
     player = @host.players.create(player_params)
     if player.persisted?
-      # `added` lets the view autofocus the input only right after an add.
-      redirect_to app_root_path(added: 1)
+      if first
+        # The owner bootstraps themselves — no "added" log entry for that.
+        @host.make_owner!(player)
+        redirect_to player_path(player.uuid)
+      else
+        @host.log_add!(player, actor: current_player)
+        # `added` lets the view autofocus the input only right after an add.
+        redirect_to app_root_path(added: 1)
+      end
     else
       redirect_to app_root_path, alert: player.errors.full_messages.to_sentence
     end
   end
 
-  # PATCH — host only. Saves the edited name and, like "done", leaves the room
+  # PATCH claim — host URL only. Someone on an admin-less host says which player
+  # they are; that player becomes the owner (first admin) and gets their own URL.
+  def claim
+    if @host.owner
+      redirect_to player_path(@host.owner.uuid)
+    else
+      @host.make_owner!(@player)
+      redirect_to player_path(@player.uuid)
+    end
+  end
+
+  # PATCH — admin only. Saves the edited name and, like "done", leaves the room
   # (giving back the present ticket). A bad name keeps us in the editing view.
   def update
     if @player.update(player_params)
       @player.toggle_room!
       redirect_to app_root_path
     else
-      redirect_to host_path(@host, editing: 1), alert: @player.errors.full_messages.to_sentence
+      redirect_to app_root_path(editing: 1), alert: @player.errors.full_messages.to_sentence
     end
   end
 
-  # DELETE — host only.
+  # DELETE — admin only. Admins can't delete other admins (demote first).
   def destroy
+    if @player.admin?
+      redirect_to app_root_path(editing: 1), alert: "Demote #{@player.name} before deleting."
+      return
+    end
     @host.update!(nominated_player: nil) if @host.nominated_player_id == @player.id
-    @host.log_delete!(@player)
+    @host.log_delete!(@player, actor: current_player)
     @player.destroy
     redirect_to app_root_path
   end
@@ -39,10 +65,26 @@ class PlayersController < ApplicationController
     redirect_to app_root_path
   end
 
-  # PATCH adjust_tickets — host only.
+  # PATCH adjust_tickets — admin only.
   def adjust_tickets
-    @host.adjust_ticket!(@player, params[:amount].to_i)
-    redirect_to host_path(@host, editing: 1)
+    @host.adjust_ticket!(@player, params[:amount].to_i, actor: current_player)
+    redirect_to app_root_path(editing: 1)
+  end
+
+  # PATCH promote — admin only. Flag a non-admin player as an admin.
+  def promote
+    @host.promote!(@player, by: current_player)
+    redirect_to app_root_path(editing: 1)
+  end
+
+  # PATCH demote — admin only. Strip a non-owner admin's flag.
+  def demote
+    if @player.id == @host.owner_id
+      redirect_to app_root_path(editing: 1), alert: "The owner can't be demoted."
+    else
+      @host.demote!(@player, by: current_player)
+      redirect_to app_root_path(editing: 1)
+    end
   end
 
   # PATCH gift — the acting player gives one of their tickets to @player.

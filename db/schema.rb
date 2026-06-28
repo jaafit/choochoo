@@ -10,12 +10,14 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_27_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_28_120000) do
   create_table "hosts", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "nominated_player_id"
+    t.integer "owner_id"
     t.datetime "updated_at", null: false
     t.string "uuid"
+    t.index ["owner_id"], name: "index_hosts_on_owner_id"
     t.index ["uuid"], name: "index_hosts_on_uuid", unique: true
   end
 
@@ -33,6 +35,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_120000) do
   end
 
   create_table "players", force: :cascade do |t|
+    t.boolean "admin", default: false, null: false
     t.datetime "created_at", null: false
     t.integer "host_id", null: false
     t.string "name", null: false

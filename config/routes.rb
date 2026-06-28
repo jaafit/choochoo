@@ -19,6 +19,9 @@ Rails.application.routes.draw do
         patch :adjust_tickets
         patch :gift
         patch :ungift
+        patch :promote
+        patch :demote
+        patch :claim
       end
     end
 
@@ -33,9 +36,14 @@ Rails.application.routes.draw do
     post  "undo",     to: "hosts#undo",         as: :undo
     post  "send_off", to: "hosts#send_off",     as: :send_off
     post  "players",  to: "players#create",     as: :players
-    patch "players/:id/toggle_room", to: "players#toggle_room", as: :toggle_room
-    patch "players/:id/gift",        to: "players#gift",        as: :gift
-    patch "players/:id/ungift",      to: "players#ungift",      as: :ungift
+    patch  "players/:id",                to: "players#update",         as: :update
+    delete "players/:id",                to: "players#destroy",        as: :destroy
+    patch "players/:id/toggle_room",   to: "players#toggle_room",    as: :toggle_room
+    patch "players/:id/adjust_tickets", to: "players#adjust_tickets", as: :adjust_tickets
+    patch "players/:id/gift",          to: "players#gift",           as: :gift
+    patch "players/:id/ungift",        to: "players#ungift",         as: :ungift
+    patch "players/:id/promote",       to: "players#promote",        as: :promote
+    patch "players/:id/demote",        to: "players#demote",         as: :demote
     get   "logs",     to: "logs#index",         as: :logs
   end
 end

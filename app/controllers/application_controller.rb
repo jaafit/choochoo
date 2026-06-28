@@ -32,9 +32,17 @@ class ApplicationController < ActionController::Base
   end
   helper_method :host_view?
 
-  # Only the host may edit tickets, delete players, or share player links.
-  def host_only!
-    redirect_to app_root_path, alert: "Not allowed." unless host_view?
+  # An admin is a player flagged as such. The host view is never an admin — the
+  # host URL only bootstraps the first admin, then redirects to the owner.
+  def current_admin?
+    !!@current_player&.admin?
+  end
+  helper_method :current_admin?
+
+  # Only admins may edit tickets/names, delete players, promote/demote, or share
+  # player links.
+  def admin_only!
+    redirect_to app_root_path, alert: "Not allowed." unless current_admin?
   end
 
   # --- Context-aware paths (host vs. player) used throughout the views --------
@@ -83,4 +91,26 @@ class ApplicationController < ActionController::Base
     host_view? ? host_logs_path(@host, opts) : player_logs_path(@current_player.uuid, opts)
   end
   helper_method :app_logs_path
+
+  # Admin actions on a player. These render only in the player (admin) view, but
+  # the host branch is kept for symmetry with the helpers above.
+  def app_player_path(player)
+    host_view? ? host_player_path(@host, player) : player_update_path(@current_player.uuid, player)
+  end
+  helper_method :app_player_path
+
+  def app_adjust_tickets_path(player)
+    host_view? ? adjust_tickets_host_player_path(@host, player) : player_adjust_tickets_path(@current_player.uuid, player)
+  end
+  helper_method :app_adjust_tickets_path
+
+  def app_promote_path(player)
+    host_view? ? promote_host_player_path(@host, player) : player_promote_path(@current_player.uuid, player)
+  end
+  helper_method :app_promote_path
+
+  def app_demote_path(player)
+    host_view? ? demote_host_player_path(@host, player) : player_demote_path(@current_player.uuid, player)
+  end
+  helper_method :app_demote_path
 end

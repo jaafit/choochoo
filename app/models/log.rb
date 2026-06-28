@@ -1,7 +1,7 @@
 class Log < ApplicationRecord
   belongs_to :host
 
-  ACTIONS = %w[nominate send_off add subtract delete gift].freeze
+  ACTIONS = %w[nominate send_off add subtract delete gift promote demote add_player].freeze
 
   validates :action, inclusion: { in: ACTIONS }
 
