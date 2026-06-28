@@ -9,8 +9,10 @@
       <% names.sort_by(&:downcase).each do |n| %>
         <li><span class="flex justify-between gap-2">
           <span><%= n %></span>
-          <% if notes[n] %>
-            <span class="opacity-60 whitespace-nowrap"><%= notes[n] %></span>
+          <% if (note = notes[n]) %>
+            <%# Color an actual ticket loss (e.g. "-1 tix") with the error color; "-0" is really zero. %>
+            <% negative = note.start_with?("-") && !note.start_with?("-0") %>
+            <span class="<%= negative ? "text-error" : "opacity-60" %> whitespace-nowrap"><%= note %></span>
           <% end %>
         </span></li>
       <% end %>
