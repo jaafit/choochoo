@@ -1,0 +1,45 @@
+<%# Rendered with no layout and injected by dashboard_controller.js. %>
+<div class="grid grid-cols-4 gap-3 mb-6 text-center">
+  <% [ [ "Hosts", @stats[:hosts] ], [ "Players", @stats[:players] ], [ "Log entries", @stats[:log_entries] ],
+       [ "Games", @stats[:games] ], [ "Tickets out", @stats[:tickets] ], [ "New hosts 30d", @stats[:new_hosts_30d] ],
+       [ "New players 30d", @stats[:new_players_30d] ], [ "New games 30d", @stats[:new_games_30d] ] ].each do |label, value| %>
+    <div class="rounded-box bg-base-200 p-2">
+      <div class="text-2xl font-bold"><%= value %></div>
+      <div class="text-[0.65rem] opacity-70"><%= label %></div>
+    </div>
+  <% end %>
+</div>
+
+<% if @logs.empty? %>
+  <p class="text-center opacity-70">No changes yet.</p>
+<% else %>
+  <ul class="divide-y divide-base-300">
+    <% @logs.each do |log| %>
+      <li class="py-3 flex items-center gap-3">
+        <span class="text-sm opacity-60 whitespace-nowrap w-24 shrink-0">
+          <%= log.created_at.strftime("%b %-d, %Y") %>
+        </span>
+        <span class="text-xs font-medium whitespace-nowrap w-28 shrink-0 truncate" title="<%= log.host.display_name %>">
+          <%= log.host.display_name %>
+        </span>
+        <div class="text-left">
+          <%= render "logs/entry", log: log %>
+        </div>
+      </li>
+    <% end %>
+  </ul>
+
+  <div class="flex items-center justify-between mt-6">
+    <% if @page > 1 %>
+      <button type="button" class="btn btn-sm" data-action="dashboard#go" data-page="<%= @page - 1 %>">← Newer</button>
+    <% else %>
+      <span></span>
+    <% end %>
+    <span class="text-sm opacity-60">page <%= @page %></span>
+    <% if @has_next %>
+      <button type="button" class="btn btn-sm" data-action="dashboard#go" data-page="<%= @page + 1 %>">Older →</button>
+    <% else %>
+      <span></span>
+    <% end %>
+  </div>
+<% end %>

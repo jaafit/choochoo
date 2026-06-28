@@ -1,0 +1,16 @@
+<% content_for :title, "Dashboard" %>
+
+<section class="mt-2 mb-6 text-center">
+  <h2 class="text-3xl font-bold">Dashboard</h2>
+</section>
+
+<%# The Stimulus controller reads the token from localStorage, fetches the data
+    fragment with it, and renders into this container. Without a valid token the
+    server returns nothing and the placeholder below stays put. %>
+<section class="max-w-2xl mx-auto"
+         data-controller="dashboard"
+         data-dashboard-url-value="<%= dashboard_data_path %>">
+  <div data-dashboard-target="content">
+    <p class="text-center opacity-70">No data.</p>
+  </div>
+</section>

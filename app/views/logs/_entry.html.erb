@@ -1,0 +1,28 @@
+<%# One log line's description, shared by the host log page and the cross-host
+    dashboard. locals: log. %>
+<% case log.action %>
+<% when "nominate" %>
+  <strong><%= log.actor_label %></strong> nominated <strong><%= log.player_name %></strong>
+  <%# Everyone present but not nominated earns a ticket. %>
+  <%= render "logs/others", names: [ log.player_name ] + log.other_names, suffix: "present",
+        notes: log.other_names.index_with { "+1 tix" } %>
+<% when "send_off" %>
+  <strong><%= log.actor_label %></strong> started <strong><%= log.player_name %></strong>'s game
+  <%# Each player sent earns +1; the chosen pays per player sent. %>
+  <%= render "logs/others", names: [ log.player_name ] + log.other_names, suffix: "players",
+        notes: log.other_names.index_with { "+1 tix" }.merge(log.player_name => log.net_ticket_label) %>
+<% when "add" %>
+  <strong><%= log.actor_label %></strong> added a ticket to <strong><%= log.player_name %></strong>
+<% when "subtract" %>
+  <strong><%= log.actor_label %></strong> subtracted a ticket from <strong><%= log.player_name %></strong>
+<% when "add_player" %>
+  <strong><%= log.actor_label %></strong> added <strong><%= log.player_name %></strong>
+<% when "delete" %>
+  <strong><%= log.actor_label %></strong> deleted <strong><%= log.player_name %></strong>
+<% when "gift" %>
+  <strong><%= log.actor_label %></strong> gave a ticket to <strong><%= log.player_name %></strong>
+<% when "promote" %>
+  <strong><%= log.actor_label %></strong> promoted <strong><%= log.player_name %></strong> to admin
+<% when "demote" %>
+  <strong><%= log.actor_label %></strong> demoted <strong><%= log.player_name %></strong>
+<% end %>

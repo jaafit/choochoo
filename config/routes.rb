@@ -4,6 +4,11 @@ Rails.application.routes.draw do
   # No host in the URL: mint one and redirect so the UUID lives in the URL.
   root "hosts#bootstrap"
 
+  # Cross-host, read-only stats dashboard. The page itself is public; its data is
+  # gated by a token the browser sends from localStorage (see DashboardController).
+  get "dashboard"      => "dashboard#index"
+  get "dashboard/data" => "dashboard#data"
+
   # /hosts/:uuid is the app. Possessing the UUID authenticates you as that
   # host's admin (see ApplicationController#current_role).
   resources :hosts, param: :uuid, only: [ :show, :update ] do
