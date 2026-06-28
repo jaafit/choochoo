@@ -16,7 +16,7 @@
 
 <% if current_admin? %>
   <%# Click the heading to rename the host; Escape cancels. %>
-  <div class="text-center mb-6" data-controller="rename-host">
+  <div class="text-center mb-10" data-controller="rename-host">
     <h1 class="text-4xl font-bold cursor-pointer inline-block" data-rename-host-target="display"
         data-action="click->rename-host#edit" title="Click to rename"><%= @host.display_name %></h1>
     <%= form_with url: app_host_path, method: :patch, scope: :host,
@@ -28,7 +28,7 @@
     <% end %>
   </div>
 <% else %>
-  <h1 class="text-4xl font-bold text-center mb-6"><%= @host.display_name %></h1>
+  <h1 class="text-4xl font-bold text-center mb-10"><%= @host.display_name %></h1>
 <% end %>
 
 <% if host_view? %>
