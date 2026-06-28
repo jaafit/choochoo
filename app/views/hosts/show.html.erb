@@ -218,6 +218,11 @@
 
     <% else %>
       <% present_count = @host.present_players.count %>
+      <% share_player = present_count == 1 ? @host.present_players.first : nil %>
+      <%# Admins can share a present player's link, but never the owner's — except
+          the owner sharing their own. %>
+      <% can_share = current_admin? && share_player &&
+           !(share_player.id == @host.owner_id && share_player.id != current_player&.id) %>
       <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div class="justify-self-start">
           <% if @host.undoable_send_off? && can_undo %>
@@ -236,14 +241,14 @@
           <% end %>
         </div>
         <div class="justify-self-end">
-          <% if current_admin? && present_count == 1 %>
+          <% if can_share %>
             <label for="share_modal" class="btn btn-outline btn-neutral">share</label>
           <% end %>
         </div>
       </div>
 
-      <% if current_admin? && present_count == 1 %>
-        <% p = @host.present_players.first %>
+      <% if can_share %>
+        <% p = share_player %>
         <% link = player_url(p.uuid) %>
         <input type="checkbox" id="share_modal" class="modal-toggle" />
         <div class="modal" role="dialog">
