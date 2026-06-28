@@ -5,6 +5,8 @@
   # entirely in the browser via the `table` Stimulus controller; the server keeps
   # no round state, so several players can run a raffle at the same time.
   editing_player = current_admin? && params[:editing].present? ? @host.players.find_by(id: params[:editing]) : nil
+  # Only the owner may edit the owner; other admins can't enter that edit view.
+  editing_player = nil if editing_player && editing_player.id == @host.owner_id && editing_player.id != current_player&.id
   gift_recipient = params[:gifting].present? ? @host.players.find_by(id: params[:gifting]) : nil
   gifting        = !host_view? && gift_recipient && gift_recipient.id != current_player&.id
 

@@ -155,7 +155,8 @@ export default class extends Controller {
     this.toggle(this.pickAreaTarget, this.present.size >= 2)
     this.toggle(this.undoSendAreaTarget, !!this.sendLogId)
 
-    const showEdit = this.adminValue && one != null
+    // Other admins can edit anyone except the owner; only the owner edits the owner.
+    const showEdit = this.adminValue && one != null && !(this.isOwner(one) && !this.isOwner(this.myIdValue))
     const showGift = !this.adminValue && one != null && one !== this.myIdValue
     // Admins can share any present player except the owner — unless it's their own.
     const showShare = this.adminValue && one != null && !(this.isOwner(one) && one !== this.myIdValue)

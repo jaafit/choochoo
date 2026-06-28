@@ -3,6 +3,7 @@ class PlayersController < ApplicationController
   before_action :admin_only!, only: [ :destroy, :update, :adjust_tickets, :promote, :demote ]
   before_action :set_player, only: [ :destroy, :update, :adjust_tickets,
                                      :gift, :ungift, :promote, :demote, :claim ]
+  before_action :protect_owner_edits, only: [ :update, :adjust_tickets ]
 
   # POST players — anyone with access (host or player) may add a player. Adding the
   # very first player (only reachable from the host URL) makes them the owner — the
@@ -94,6 +95,14 @@ class PlayersController < ApplicationController
 
   def set_player
     @player = @host.players.find(params[:id])
+  end
+
+  # Only the owner may change the owner's own name or ticket count. Other admins
+  # are blocked here (and don't see the edit affordance; see show.html.erb and
+  # table_controller#render).
+  def protect_owner_edits
+    return unless @player.id == @host.owner_id && current_player&.id != @host.owner_id
+    redirect_to app_root_path, alert: "Only #{@player.name} can edit the owner."
   end
 
   def player_params
