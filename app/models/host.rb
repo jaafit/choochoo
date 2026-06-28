@@ -86,10 +86,14 @@ class Host < ApplicationRecord
 
   # Make the player the host's owner: its first admin. Used when the first player
   # adds themselves, or when someone claims a player on an admin-less host.
+  #
+  # Clearing the UUID retires the host URL: once there's an owner, that URL is no
+  # longer a control surface, so we drop it entirely. Everyone now acts through
+  # their own player URL. (Existing hosts created before this aren't backfilled.)
   def make_owner!(player)
     transaction do
       player.update!(admin: true)
-      update!(owner: player)
+      update!(owner: player, uuid: nil)
     end
   end
 

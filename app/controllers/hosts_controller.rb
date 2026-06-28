@@ -10,9 +10,11 @@ class HostsController < ApplicationController
 
   # GET /hosts/:uuid  or  /player/:player_uuid
   #
-  # Once the host has an owner, the host URL is no longer a control surface — it
-  # redirects to the owner's player URL. Before that it bootstraps the first admin
-  # (add-yourself, or "Which player are you?"); see the view.
+  # Before the host has an owner, the host URL bootstraps the first admin
+  # (add-yourself, or "Which player are you?"); see the view. Becoming an owner
+  # clears the host UUID (see Host#make_owner!), so for hosts created since then
+  # the host URL stops resolving entirely. The redirect below only fires for
+  # legacy hosts that still carry a UUID alongside an owner.
   def show
     redirect_to player_path(@host.owner.uuid) if host_view? && @host.owner
   end
