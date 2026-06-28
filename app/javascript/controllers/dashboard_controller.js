@@ -29,9 +29,25 @@ export default class extends Controller {
         headers: { "X-Someonepick-Token": token, "Accept": "text/html" }
       })
       const html = res.ok ? (await res.text()).trim() : ""
-      if (html) this.contentTarget.innerHTML = html
+      if (html) {
+        this.contentTarget.innerHTML = html
+        this.localizeTimes()
+      }
     } catch (_) {
       // Network error: leave the placeholder in place.
     }
+  }
+
+  // Rewrites each log entry's date/time into the browser's local timezone. The
+  // server renders a date as a fallback; this fills in the matching time.
+  localizeTimes() {
+    this.contentTarget.querySelectorAll(".js-localtime").forEach((el) => {
+      const d = new Date(el.dataset.ts)
+      if (isNaN(d)) return
+      el.querySelector(".js-date").textContent =
+        d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+      el.querySelector(".js-time").textContent =
+        d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    })
   }
 }

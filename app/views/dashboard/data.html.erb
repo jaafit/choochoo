@@ -16,8 +16,10 @@
   <ul class="divide-y divide-base-300">
     <% @logs.each do |log| %>
       <li class="py-3 flex items-center gap-3">
-        <span class="text-sm opacity-60 whitespace-nowrap w-24 shrink-0">
-          <%= log.created_at.strftime("%b %-d, %Y") %>
+        <span class="text-sm opacity-60 w-24 shrink-0 flex flex-col leading-tight js-localtime" data-ts="<%= log.created_at.iso8601 %>">
+          <%# Filled in by dashboard_controller.js in the browser's local timezone. %>
+          <span class="js-date"><%= log.created_at.strftime("%b %-d, %Y") %></span>
+          <span class="js-time text-xs"></span>
         </span>
         <span class="text-xs font-medium whitespace-nowrap w-28 shrink-0 truncate" title="<%= log.host.display_name %>">
           <%= log.host.display_name %>
