@@ -13,7 +13,7 @@ Rails.application.routes.draw do
       post :send_off
     end
 
-    resources :players, only: [ :create, :destroy ] do
+    resources :players, only: [ :create, :destroy, :update ] do
       member do
         patch :toggle_room
         patch :adjust_tickets

@@ -123,11 +123,7 @@
           <%= button_to "-", adjust_tickets_host_player_path(@host, p, amount: -1), method: :patch, class: "btn" %>
           <%= button_to "+", adjust_tickets_host_player_path(@host, p, amount: 1), method: :patch, class: "btn" %>
         </div>
-        <div class="justify-self-end">
-          <%# Done leaves the room entirely (gives back the present ticket), rather
-              than returning to the 'present' state. %>
-          <%= button_to "done", app_toggle_room_path(p), method: :patch, class: "btn" %>
-        </div>
+        <div></div>
       </div>
 
     <% elsif gifting %>
@@ -203,12 +199,23 @@
   </section>
 </div>
 
-<%# ---- Add player --------------------------------------------------------- %>
+<%# ---- Add / edit player -------------------------------------------------- %>
 <section class="mt-8">
-  <%= form_with url: app_players_path, scope: :player, class: "flex flex-wrap items-center gap-3" do |f| %>
-    <%= f.text_field :name, placeholder: "Someone's name", autocomplete: "off",
-          autofocus: params[:added].present?, maxlength: 12, class: "input input-bordered" %>
-    <%= f.submit "Add", class: "btn btn-secondary" %>
+  <% if editing_player %>
+    <%# Editing: the input holds the player's current name; "Done" (where "Add"
+        sits) saves it and then leaves the room (giving back the present ticket). %>
+    <%= form_with url: host_player_path(@host, editing_player), method: :patch,
+          scope: :player, class: "flex flex-wrap items-center gap-3" do |f| %>
+      <%= f.text_field :name, value: editing_player.name, autocomplete: "off",
+            autofocus: true, maxlength: 12, class: "input input-bordered" %>
+      <%= f.submit "Done", class: "btn btn-primary" %>
+    <% end %>
+  <% else %>
+    <%= form_with url: app_players_path, scope: :player, class: "flex flex-wrap items-center gap-3" do |f| %>
+      <%= f.text_field :name, placeholder: "Someone's name", autocomplete: "off",
+            autofocus: params[:added].present?, maxlength: 12, class: "input input-bordered" %>
+      <%= f.submit "Add", class: "btn btn-secondary" %>
+    <% end %>
   <% end %>
 </section>
 

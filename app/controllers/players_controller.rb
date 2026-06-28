@@ -1,7 +1,7 @@
 class PlayersController < ApplicationController
   before_action :set_host
-  before_action :host_only!, only: [ :destroy, :adjust_tickets ]
-  before_action :set_player, only: [ :destroy, :toggle_room, :adjust_tickets, :gift, :ungift ]
+  before_action :host_only!, only: [ :destroy, :update, :adjust_tickets ]
+  before_action :set_player, only: [ :destroy, :update, :toggle_room, :adjust_tickets, :gift, :ungift ]
 
   # POST players — anyone with access (host or player) may add a player.
   def create
@@ -11,6 +11,17 @@ class PlayersController < ApplicationController
       redirect_to app_root_path(added: 1)
     else
       redirect_to app_root_path, alert: player.errors.full_messages.to_sentence
+    end
+  end
+
+  # PATCH — host only. Saves the edited name and, like "done", leaves the room
+  # (giving back the present ticket). A bad name keeps us in the editing view.
+  def update
+    if @player.update(player_params)
+      @player.toggle_room!
+      redirect_to app_root_path
+    else
+      redirect_to host_path(@host, editing: 1), alert: @player.errors.full_messages.to_sentence
     end
   end
 
