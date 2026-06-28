@@ -1,5 +1,6 @@
 class HostsController < ApplicationController
-  before_action :set_host, only: [ :show, :nominate, :undo, :send_off ]
+  before_action :set_host, only: [ :show, :update, :nominate, :undo, :send_off ]
+  before_action :admin_only!, only: [ :update ]
 
   # GET / — no host in the URL, so create one and put its UUID in the URL.
   def bootstrap
@@ -14,6 +15,13 @@ class HostsController < ApplicationController
   # (add-yourself, or "Which player are you?"); see the view.
   def show
     redirect_to player_path(@host.owner.uuid) if host_view? && @host.owner
+  end
+
+  # PATCH — admin only. Rename the host. Strong params + Active Record keep the
+  # value parameterized, so there's no SQL-injection surface.
+  def update
+    @host.update(host_params)
+    redirect_to app_root_path, alert: @host.errors.full_messages.to_sentence.presence
   end
 
   # POST nominate — host or any player may nominate (no need to be present).
@@ -38,5 +46,11 @@ class HostsController < ApplicationController
   def send_off
     @host.send_off!(params[:member_ids] || [], actor: current_player)
     redirect_to app_root_path
+  end
+
+  private
+
+  def host_params
+    params.require(:host).permit(:name)
   end
 end

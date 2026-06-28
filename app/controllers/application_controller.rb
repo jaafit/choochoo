@@ -92,6 +92,12 @@ class ApplicationController < ActionController::Base
   end
   helper_method :app_logs_path
 
+  # The host itself (used to rename it). Renders only in the admin/player view.
+  def app_host_path
+    host_view? ? host_path(@host) : player_path(@current_player.uuid)
+  end
+  helper_method :app_host_path
+
   # Admin actions on a player. These render only in the player (admin) view, but
   # the host branch is kept for symmetry with the helpers above.
   def app_player_path(player)

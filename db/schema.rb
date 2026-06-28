@@ -10,9 +10,10 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_28_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_28_140000) do
   create_table "hosts", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.string "name"
     t.integer "nominated_player_id"
     t.integer "owner_id"
     t.datetime "updated_at", null: false

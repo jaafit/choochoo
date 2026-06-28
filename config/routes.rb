@@ -6,7 +6,7 @@ Rails.application.routes.draw do
 
   # /hosts/:uuid is the app. Possessing the UUID authenticates you as that
   # host's admin (see ApplicationController#current_role).
-  resources :hosts, param: :uuid, only: [ :show ] do
+  resources :hosts, param: :uuid, only: [ :show, :update ] do
     member do
       post :nominate
       post :undo
@@ -32,6 +32,7 @@ Rails.application.routes.draw do
   # never appears in these URLs.
   scope "player/:player_uuid", as: :player do
     get   "",         to: "hosts#show",         as: ""
+    patch "",         to: "hosts#update"
     post  "nominate", to: "hosts#nominate",     as: :nominate
     post  "undo",     to: "hosts#undo",         as: :undo
     post  "send_off", to: "hosts#send_off",     as: :send_off

@@ -6,10 +6,18 @@ class Host < ApplicationRecord
   belongs_to :owner, class_name: "Player", optional: true
 
   before_create :assign_uuid
+  before_validation :normalize_name
+
+  validates :name, length: { maximum: 20 }
 
   # Use the UUID (not the numeric id) in URLs.
   def to_param
     uuid
+  end
+
+  # The header/title text: the host's chosen name, or the default.
+  def display_name
+    name.presence || "Someone Pick"
   end
 
   # Everyone, always alphabetical (case-insensitive) regardless of room status or
@@ -230,6 +238,10 @@ class Host < ApplicationRecord
   end
 
   private
+
+  def normalize_name
+    name&.strip!
+  end
 
   def assign_uuid
     self.uuid ||= SecureRandom.uuid
