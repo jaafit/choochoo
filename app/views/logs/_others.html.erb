@@ -4,7 +4,7 @@
 <% if names.any? %>
   <%# Focus-based dropdown so a click outside (blur) closes it. %>
   <div class="dropdown dropdown-end inline-block align-middle">
-    <div tabindex="0" role="button" class="btn btn-xs btn-outline"><%= names.size %> <%= suffix %></div>
+    <div tabindex="0" role="button" class="btn btn-xs btn-outline text-[0.625rem]"><%= names.size %> <%= suffix %></div>
     <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box shadow z-[1] w-44 p-2 mt-1 text-left">
       <% names.sort_by(&:downcase).each do |n| %>
         <li><span class="flex justify-between gap-2">

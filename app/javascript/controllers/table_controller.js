@@ -18,9 +18,15 @@ export default class extends Controller {
     myId: Number, admin: Boolean, base: String
   }
 
-  accent = ["bg-accent", "text-accent-content", "ring-2", "ring-accent", "shadow-lg"]
-  primary = ["bg-primary", "text-primary-content", "shadow-md"]
-  baseLook = ["bg-base-100", "shadow-md"]
+  // Tile looks, by state. All are light fills (the role-coloured name stays
+  // legible on every one); the state is signalled by the border, ring and the
+  // pill badge rather than a flooded background. Kept in sync with _card.html.erb
+  // and the static tile markup in hosts/show.html.erb.
+  baseLook    = ["bg-[#FAF5EA]", "border-[#E7DBC2]", "shadow-[0_3px_8px_rgba(20,12,4,.3)]"]
+  presentLook = ["bg-[#DCE6FA]", "border-[1.5px]", "border-[#2E6BD6]", "shadow-[0_0_0_3px_rgba(46,107,214,.22),0_3px_8px_rgba(20,12,4,.3)]"]
+  playingLook = ["bg-[#DCEFEA]", "border-[1.5px]", "border-[#159B82]", "shadow-[0_0_0_3px_rgba(21,155,130,.22),0_3px_8px_rgba(20,12,4,.3)]"]
+  pickerLook  = ["bg-[#FBE2DC]", "border-[1.5px]", "border-[#EE5A43]", "shadow-[0_0_0_3px_rgba(238,90,67,.25),0_3px_8px_rgba(20,12,4,.3)]"]
+  badgeColors = ["bg-[#2E6BD6]", "bg-[#159B82]", "bg-[#EE5A43]"]
 
   connect() {
     this.present = new Set()
@@ -109,7 +115,9 @@ export default class extends Controller {
     let delay = 90, elapsed = 0, current = null
     const hop = () => {
       current = this.nextCell(cells, current)
-      cells.forEach((c) => c.classList.toggle("bg-accent", c === current))
+      // The flicking highlight uses the picker colour (coral), the same fill the
+      // winner's tile and "picker" badge get when the wheel settles.
+      cells.forEach((c) => c.classList.toggle("bg-[#EE5A43]", c === current))
       if (elapsed >= 2500) { settle(); return }
       this.timer = setTimeout(hop, delay)
       elapsed += delay
@@ -204,39 +212,51 @@ export default class extends Controller {
 
   renderCard(el) {
     const id = Number(el.dataset.playerId)
-    const base = Math.max(0, Number(el.dataset.tickets) || 0)
-    const card = el.querySelector(".card")
-    const badge = el.querySelector(".badge")
+    const baseTix = Math.max(0, Number(el.dataset.tickets) || 0)
+    const tile = el.querySelector(".js-tile")
+    const badge = el.querySelector(".js-badge")
     const tix = el.querySelector(".js-tickets")
+    const plus = el.querySelector(".js-plus")
 
-    let look, label, display
+    // state: null (idle/absent) | "present" | "playing" | "picker". A non-null
+    // state means a highlighted tile: dark ticket number, coloured pill badge.
+    let look, state, display, showPlus
     if (this.phase !== "idle" && id === this.winnerId) {
       // Picker mid-round: the present credit (+1) minus one per player in the
       // game (the picker plus each player added). P is capped at N+1 so the
       // result never drops below 0.
-      look = this.accent; label = "picker"
-      display = `${base}+1-${Math.min(this.playing.size + 1, base + 1)}`
+      look = this.pickerLook; state = "picker"; showPlus = false
+      display = `${baseTix}+1-${Math.min(this.playing.size + 1, baseTix + 1)}`
     } else if (this.present.has(id)) {
-      const playing = this.phase === "selecting" && this.playing.has(id)
-      // While the wheel spins, present cards drop to the base look so the dashed
-      // ticket cells overlaid on them stay legible; the highlight rides the cells.
-      look = this.phase === "spinning" ? this.baseLook : (playing ? this.accent : this.primary)
-      label = playing ? "playing" : "present"
-      display = `${base}+1`
+      const isPlaying = this.phase === "selecting" && this.playing.has(id)
+      // Present tiles keep their blue "present" look throughout the spin (the
+      // tag and ticket math still hide — see `animating` below); the dashed
+      // ticket cells overlay them and the coral highlight rides the cells.
+      look = isPlaying ? this.playingLook : this.presentLook
+      state = isPlaying ? "playing" : "present"
+      display = `${baseTix}`; showPlus = true
     } else {
-      look = this.baseLook; label = ""; display = base
+      look = this.baseLook; state = null; display = `${baseTix}`; showPlus = false
     }
 
-    // While a card is animating (present, mid-spin) only its name shows over the
-    // ticket cells — the tag and the ticket math hide (kept in flow via
+    // While a tile is animating (present, mid-spin) only its name shows over the
+    // ticket cells — the badge and the ticket math hide (kept in flow via
     // visibility so nothing shifts when the spin starts or stops).
     const animating = this.phase === "spinning" && this.present.has(id)
-    this.setLook(card, look)
-    badge.textContent = label || "·"
-    badge.classList.toggle("invisible", animating || !label)
-    badge.classList.toggle("badge-neutral", !!label)
+    this.setLook(tile, look)
+
+    badge.textContent = state || ""
+    this.setBadgeColor(badge, state)
+    badge.classList.toggle("hidden", animating || !state)
+
     tix.textContent = display
+    // Highlighted tiles get the dark ink number; quiet ones the muted brown.
+    tix.classList.toggle("text-[#33271A]", state != null)
+    tix.classList.toggle("text-[#8A7A5E]", state == null)
     tix.classList.toggle("invisible", animating)
+
+    plus.classList.toggle("hidden", !showPlus)
+    plus.classList.toggle("invisible", animating)
   }
 
   // --- helpers --------------------------------------------------------------
@@ -245,11 +265,19 @@ export default class extends Controller {
   nameFor(id) { return this.cardFor(id)?.dataset.name || "" }
   toggle(el, on) { if (el) el.classList.toggle("hidden", !on) }
 
-  setLook(card, look) {
-    if (!card) return
-    const all = [...this.accent, ...this.primary, ...this.baseLook]
-    card.classList.remove(...all)
-    card.classList.add(...look)
+  setLook(tile, look) {
+    if (!tile) return
+    const all = [...this.baseLook, ...this.presentLook, ...this.playingLook, ...this.pickerLook]
+    tile.classList.remove(...all)
+    tile.classList.add(...look)
+  }
+
+  // Pill badge colour follows the tile state (blue present, teal playing, coral
+  // picker); the default keeps blue so an empty badge has a sane colour.
+  setBadgeColor(badge, state) {
+    if (!badge) return
+    badge.classList.remove(...this.badgeColors)
+    badge.classList.add(state === "playing" ? "bg-[#159B82]" : state === "picker" ? "bg-[#EE5A43]" : "bg-[#2E6BD6]")
   }
 
   // Update ticket counts in place from the authoritative roster. If the set of

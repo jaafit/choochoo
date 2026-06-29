@@ -9,9 +9,59 @@
  * Consider organizing styles into separate files for maintainability.
  */
 
-/* Reduce button rounding to 4px (leave circular/square buttons untouched). */
-.btn:not(.btn-circle):not(.btn-square) {
-  border-radius: 0.25rem;
+/* ---- someonepick custom theme -------------------------------------------
+   DaisyUI v4 stores theme colours as OKLCH components (L% C H) read through
+   oklch(var(--p)). The CDN's full.min.css only ships the stock themes, so we
+   define ours here; the hex source for each line is noted alongside. Replaces
+   the old `cupcake` theme (see data-theme on <html>). */
+[data-theme="someonepick"] {
+  color-scheme: light;
+  --p:  65.8695% 0.18703 31.3230;   --pc: 100% 0 0;        /* primary  #EE5A43 */
+  --s:  54.8489% 0.17657 260.7364;  --sc: 100% 0 0;        /* secondary #2E6BD6 */
+  --a:  61.7627% 0.11219 175.3557;  --ac: 100% 0 0;        /* accent   #159B82 */
+  --n:  28.2733% 0.02861 68.4973;   --nc: 97.1023% 0.01549 86.4245; /* neutral #33271A / #FAF5EA */
+  --b1: 97.1023% 0.01549 86.4245;   /* base-100 #FAF5EA */
+  --b2: 93.0293% 0.02988 85.5648;   /* base-200 #F1E7D2 */
+  --b3: 89.4470% 0.03583 85.4066;   /* base-300 #E7DBC2 */
+  --bc: 28.2733% 0.02861 68.4973;   /* base-content #33271A */
+  --in: 54.8489% 0.17657 260.7364;  --inc: 100% 0 0;       /* info    #2E6BD6 */
+  --su: 61.7627% 0.11219 175.3557;  --suc: 100% 0 0;       /* success #159B82 */
+  --wa: 76.7590% 0.13594 80.4552;   --wac: 0% 0 0;         /* warning #E0A93E */
+  --er: 56.8260% 0.18334 33.0511;   --erc: 100% 0 0;       /* error   #CC3E22 */
+  --rounded-box: 0.9rem;
+  --rounded-btn: 0.75rem;
+  --rounded-badge: 1.9rem;
+  --animation-btn: 0.25s;
+  --animation-input: .2s;
+  --btn-focus-scale: 0.95;
+  --border-btn: 1px;
+  --tab-border: 2px;
+  --tab-radius: 0.7rem;
+}
+
+/* Google Fonts loaded in the layout <head>. DM Sans is the UI face; the venue
+   title uses the serif display and ticket counts use the monospace. */
+body { font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif; }
+.font-display { font-family: "DM Serif Display", ui-serif, Georgia, serif; }
+.font-tix     { font-family: "Space Mono", ui-monospace, monospace; }
+
+/* The app shell is a rounded panel floating over a neutral backdrop. The picker
+   screen lays its panel over the wood-table photo with a flat darken overlay so
+   cards and white text pop; other screens (log, dashboard) use a plain cream
+   panel for legible dark-on-light body text. */
+/* The picker prints white text over the wood, so a flat darken overlay helps the
+   cards and text pop. The log uses near-black text on the same wood, so it skips
+   the overlay — the lighter, un-darkened surface reads better under dark text. */
+.panel-wood {
+  color: #fff;
+  background:
+    linear-gradient(rgba(22, 13, 4, .18), rgba(22, 13, 4, .18)),
+    url("/wood_background.jpg") center / cover,
+    #B0A295;
+}
+.panel-log {
+  color: #000;
+  background: url("/wood_background.jpg") center / cover, #B0A295;
 }
 
 /* Disable DaisyUI's button-pop animation — it replays on every Turbo render,

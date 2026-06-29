@@ -1,4 +1,5 @@
 <% content_for :title, "Log" %>
+<% content_for :log_panel, "1" %><%# wood surface (as the picker) with black text %>
 
 <section class="mt-2 mb-6 text-center">
   <h2 class="text-3xl font-bold">Log</h2>
@@ -13,13 +14,13 @@
         override lives. Limited to the single latest log. The owner's own actions
         can only be undone by the owner. %>
     <% latest = @page == 1 ? @logs.first : nil %>
-    <ul class="divide-y divide-base-300">
+    <ul class="divide-y divide-black/15">
       <% @logs.each do |log| %>
-        <li class="py-3 flex items-center gap-3">
-          <span class="text-sm opacity-60 whitespace-nowrap w-28 shrink-0">
+        <li class="py-3 flex items-center gap-6">
+          <span class="text-[0.525rem] opacity-60 whitespace-nowrap shrink-0">
             <%= log.created_at.strftime("%b %-d, %Y") %>
           </span>
-          <div class="text-left">
+          <div class="text-left text-[0.725rem]">
             <%= render "logs/entry", log: log %>
           </div>
           <% if current_admin? && log == latest %>

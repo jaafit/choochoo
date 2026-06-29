@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html data-theme="cupcake">
+<html data-theme="someonepick">
   <head>
     <title><%= content_for(:title) || "Someone Pick" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -18,6 +18,11 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
 
+    <%# Brand typography: DM Serif Display (venue title), DM Sans (UI), Space Mono (ticket counts). %>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
     <%# Tailwind + DaisyUI via CDN (no build step) %>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -27,8 +32,10 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body style="background-color: #88bbdd" class="min-h-screen">
-    <main class="container mx-auto max-w-5xl px-4 py-6">
+  <body class="min-h-screen flex justify-center items-start bg-[#D7D2CB]">
+    <%# The picker screen sets :wood to lay the table photo behind the content;
+        other screens fall back to a plain cream surface for dark-on-light text. %>
+    <main class="relative w-full max-w-[860px] min-h-screen pt-[22px] px-[18px] pb-6 <%= content_for?(:wood) ? "panel-wood overflow-hidden" : content_for?(:log_panel) ? "panel-log" : "bg-base-100" %>">
       <% if flash[:alert] %>
         <div class="alert alert-warning mb-4"><%= flash[:alert] %></div>
       <% end %>

@@ -1,4 +1,5 @@
 <% content_for :title, "#{@host.display_name} | someonepick.com" %>
+<% content_for :wood, "1" %><%# float this screen's panel over the wood-table photo %>
 <%
   # Editing (admin) and gifting are server-rendered sub-flows focused on one
   # player by id. The raffle itself (present → pick → who's playing → send) lives
@@ -14,53 +15,59 @@
   can_share = ->(player) { !(player.id == @host.owner_id && player.id != current_player&.id) }
 %>
 
-<% if current_admin? %>
-  <%# Click the heading to rename the host; Escape cancels. %>
-  <div class="text-center mb-10" data-controller="rename-host">
-    <h1 class="text-4xl font-bold cursor-pointer inline-block" data-rename-host-target="display"
-        data-action="click->rename-host#edit" title="Click to rename"><%= @host.display_name %></h1>
-    <%= form_with url: app_host_path, method: :patch, scope: :host,
-          class: "hidden", data: { rename_host_target: "form" } do |f| %>
-      <%= f.text_field :name, value: @host.name, maxlength: 20, autocomplete: "off",
-            placeholder: "Location name",
-            class: "input input-bordered text-2xl font-bold text-center w-full max-w-md",
-            data: { rename_host_target: "input", action: "keydown.esc->rename-host#cancel" } %>
-    <% end %>
-  </div>
-<% else %>
-  <h1 class="text-4xl font-bold text-center mb-10"><%= @host.display_name %></h1>
-<% end %>
+<%# ---- Brand row: logo + the host name (click to rename), falling back to the
+        someonepick.com wordmark while the host is still unnamed. ------------- %>
+<div class="flex items-center gap-3 mb-6">
+  <%= image_tag "/logo.png", alt: "", class: "h-[54px] w-auto flex-none drop-shadow-[0_3px_4px_rgba(0,0,0,.3)]" %>
+  <% if current_admin? %>
+    <%# Click the label to rename the host; Escape cancels. %>
+    <div class="min-w-0 flex-1" data-controller="rename-host">
+      <div class="cursor-pointer inline-block" data-rename-host-target="display"
+           data-action="click->rename-host#edit" title="Click to rename">
+        <%= render "brand_label" %>
+      </div>
+      <%= form_with url: app_host_path, method: :patch, scope: :host,
+            class: "hidden", data: { rename_host_target: "form" } do |f| %>
+        <%= f.text_field :name, value: @host.name, maxlength: 20, autocomplete: "off",
+              placeholder: "Location name",
+              class: "input input-bordered text-2xl font-bold w-full text-base-content placeholder:text-[#B3A079]",
+              data: { rename_host_target: "input", action: "keydown.esc->rename-host#cancel" } %>
+      <% end %>
+    </div>
+  <% else %>
+    <%= render "brand_label" %>
+  <% end %>
+</div>
 
 <% if host_view? %>
   <%# ---- Bootstrap: the host URL only mints the first admin (the owner). ----- %>
   <% if @host.players.empty? %>
     <section class="mt-8 text-center">
-      <p class="text-xl mb-4">Add yourself to get started.</p>
+      <p class="text-xl mb-4 text-white [text-shadow:0_1px_3px_rgba(20,12,4,.5)]">Add yourself to get started.</p>
       <%= form_with url: app_players_path, scope: :player, class: "mx-auto w-full max-w-xs" do |f| %>
         <div class="relative">
           <%= f.text_field :name, placeholder: "Your name", autocomplete: "off",
                 autofocus: true, maxlength: 12,
-                class: "input input-bordered w-full pr-14 rounded-as-card" %>
-          <%= f.submit "+", class: "btn btn-primary btn-sm rounded-as-card absolute right-1.5 top-1/2 -translate-y-1/2" %>
+                class: "w-full rounded-[10px] border border-[#E7DBC2] bg-[#FAF5EA] py-[9px] pl-[14px] pr-[46px] text-[13px] text-base-content placeholder:text-[#B3A079] shadow-[0_3px_8px_rgba(20,12,4,.25)] focus:outline-none" %>
+          <%= f.submit "+", class: "absolute right-[6px] top-1/2 -translate-y-1/2 h-[34px] w-[34px] cursor-pointer rounded-[8px] border-0 bg-secondary text-[18px] font-bold leading-none text-white" %>
         </div>
       <% end %>
     </section>
   <% else %>
     <%# Players exist but nobody is an admin yet: claim which one you are. %>
     <section class="mt-2 mb-6">
-      <div class="grid grid-cols-4 gap-1.5 sm:gap-3">
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2 auto-rows-[66px]">
         <% @host.roster.each do |player| %>
           <%= button_to claim_host_player_path(@host, player), method: :patch,
-                class: "block w-full p-0 bg-transparent border-0",
-                form: { data: { turbo_confirm: "Confirm you are #{player.name}?" } } do %>
-            <%= render "card", player: player, classes: "bg-base-100 shadow-md",
-                  tickets_display: player.tickets, badge: nil %>
+                class: "block h-full w-full p-0 bg-transparent border-0",
+                form: { class: "h-full", data: { turbo_confirm: "Confirm you are #{player.name}?" } } do %>
+            <%= render "card", player: player, tickets_display: player.tickets, badge: nil %>
           <% end %>
         <% end %>
       </div>
     </section>
     <section class="text-center">
-      <p class="text-2xl">Which player are you?</p>
+      <p class="text-2xl text-white [text-shadow:0_1px_3px_rgba(20,12,4,.5)]">Which player are you?</p>
     </section>
   <% end %>
 
@@ -68,18 +75,19 @@
   <%# ---- Admin edit controls for one focused player ----------------------- %>
   <% p = editing_player %>
   <section class="mt-2 mb-6">
-    <div class="grid grid-cols-4 gap-1.5 sm:gap-3">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2 auto-rows-[66px]">
       <% @host.roster.each do |player| %>
         <% focus = player.id == p.id %>
-        <%= render "card", player: player,
-              classes: (focus ? "bg-secondary text-secondary-content shadow-md" : "bg-base-100 shadow-md"),
+        <%= render "card", player: player, present: focus,
               tickets_display: player.tickets, badge: (focus ? "editing" : nil),
               mine: (player.id == current_player&.id) %>
       <% end %>
     </div>
   </section>
 
-  <section class="text-center">
+  <%# Same reserved height as the table's actions section so the name input below
+      lands at the same vertical spot as the "Someone's name" composer. %>
+  <section class="text-center min-h-[7rem] flex flex-col justify-center">
     <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 actions-row">
       <div class="justify-self-start">
         <% unless p.admin? %>
@@ -93,26 +101,29 @@
       </div>
       <div class="justify-self-end">
         <% if p.id == @host.owner_id %>
-          <span class="text-sm opacity-60">owner</span>
+          <span class="text-sm text-white/70">owner</span>
         <% elsif p.admin? %>
-          <%= button_to "demote", app_demote_path(p), method: :patch, class: "btn btn-outline",
+          <%= button_to "demote", app_demote_path(p), method: :patch, class: "btn btn-neutral",
                 form: { data: { turbo_confirm: "Demote #{p.name} from admin?" } } %>
         <% else %>
-          <%= button_to "promote", app_promote_path(p), method: :patch, class: "btn btn-outline",
+          <%= button_to "promote", app_promote_path(p), method: :patch, class: "btn btn-neutral",
                 form: { data: { turbo_confirm: "Promote #{p.name} to admin? They will be able to edit player names and ticket counts, promote/demote (except #{@host.owner&.name}), and delete non-admins." } } %>
         <% end %>
       </div>
     </div>
   </section>
 
-  <%# Edit the focused player's name; "Done" saves and returns to the table. %>
-  <section class="mt-8">
+  <%# Edit the focused player's name; "Done" saves and returns to the table. The
+      mt matches the composer's so this input lines up with "Someone's name". %>
+  <section class="mt-[18px]">
     <%= form_with url: app_player_path(p), method: :patch, scope: :player do |f| %>
       <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <%# Same cream pill styling (and height) as the "Someone's name" composer. %>
         <%= f.text_field :name, value: p.name, autocomplete: "off",
               autofocus: true, maxlength: 12,
-              class: "input input-bordered w-full max-w-xs justify-self-start rounded-as-card" %>
+              class: "w-full max-w-xs justify-self-start rounded-[10px] border border-[#E7DBC2] bg-[#FAF5EA] py-[9px] px-[14px] text-[13px] text-base-content placeholder:text-[#B3A079] shadow-[0_3px_8px_rgba(20,12,4,.25)] focus:outline-none" %>
         <%= f.submit "Done", class: "btn btn-primary justify-self-center" %>
+
         <div></div>
       </div>
     <% end %>
@@ -122,11 +133,10 @@
   <%# ---- Give tickets to one recipient ------------------------------------ %>
   <% r = gift_recipient %>
   <section class="mt-2 mb-6">
-    <div class="grid grid-cols-4 gap-1.5 sm:gap-3">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2 auto-rows-[66px]">
       <% @host.roster.each do |player| %>
         <% focus = player.id == r.id %>
-        <%= render "card", player: player,
-              classes: (focus ? "bg-secondary text-secondary-content shadow-md" : "bg-base-100 shadow-md"),
+        <%= render "card", player: player, present: focus,
               tickets_display: player.tickets, badge: (focus ? "recipient" : nil),
               mine: (player.id == current_player&.id) %>
       <% end %>
@@ -134,7 +144,7 @@
   </section>
 
   <section class="text-center">
-    <p class="text-2xl mb-4">Give tickets to <%= r.name %></p>
+    <p class="text-2xl mb-4 text-white [text-shadow:0_1px_3px_rgba(20,12,4,.5)]">Give tickets to <%= r.name %></p>
     <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 actions-row">
       <div></div>
       <div class="justify-self-center flex items-center gap-3">
@@ -150,14 +160,20 @@
         <% end %>
       </div>
       <div class="justify-self-end">
-        <%= link_to "done", app_root_path, class: "btn" %>
+        <%= link_to "done", app_root_path, class: "btn btn-neutral" %>
       </div>
     </div>
-    <p class="mt-3 text-sm opacity-70">You have <%= current_player.tickets %> tix to give.</p>
+    <p class="mt-3 text-sm text-white/80">You have <%= current_player.tickets %> tix to give.</p>
   </section>
 
 <% else %>
   <%# ---- The table: client-side raffle ------------------------------------ %>
+  <%# Safelist: the present/playing/picker tile looks are added by table_controller.js
+      at runtime; listing them once here (hidden) guarantees the Tailwind CDN has
+      generated these arbitrary utilities before the first tap. Keep in sync with
+      the look/badge class arrays in table_controller.js. %>
+  <div class="hidden bg-[#DCE6FA] border-[1.5px] border-[#2E6BD6] shadow-[0_0_0_3px_rgba(46,107,214,.22),0_3px_8px_rgba(20,12,4,.3)] bg-[#DCEFEA] border-[#159B82] shadow-[0_0_0_3px_rgba(21,155,130,.22),0_3px_8px_rgba(20,12,4,.3)] bg-[#FBE2DC] border-[#EE5A43] shadow-[0_0_0_3px_rgba(238,90,67,.25),0_3px_8px_rgba(20,12,4,.3)] bg-[#159B82] bg-[#EE5A43]" aria-hidden="true"></div>
+
   <div data-controller="table"
        data-table-nominate-url-value="<%= app_nominate_path %>"
        data-table-send-url-value="<%= app_send_off_path %>"
@@ -166,38 +182,44 @@
        data-table-admin-value="<%= current_admin? %>">
 
     <section class="mt-2 mb-6">
-      <div class="grid grid-cols-4 gap-1.5 sm:gap-3">
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2 auto-rows-[66px]">
         <% @host.roster.each do |player| %>
-          <button type="button" class="block w-full p-0 bg-transparent border-0 cursor-pointer select-none"
+          <button type="button" class="block h-full w-full p-0 bg-transparent border-0 cursor-pointer select-none"
                   data-table-target="card" data-action="click->table#tapCard"
                   data-player-id="<%= player.id %>" data-tickets="<%= player.tickets %>"
                   data-name="<%= player.name %>" data-owner="<%= player.id == @host.owner_id %>">
-            <div class="card h-full transition-shadow bg-base-100 shadow-md relative">
-              <%# Per-ticket cells laid over the card during the pick animation. The
+            <div class="js-tile relative h-full flex flex-col items-center justify-center gap-[3px] rounded-[11px] border bg-[#FAF5EA] border-[#E7DBC2] px-1.5 text-center shadow-[0_3px_8px_rgba(20,12,4,.3)] transition-[background-color,border-color,box-shadow]">
+              <%# Per-ticket cells laid over the tile during the pick animation. The
                   table controller fills these and flicks a highlight through them;
                   they're an absolute overlay so the name/math never shift. %>
               <div class="js-rail absolute inset-0 p-2 hidden items-stretch gap-1" aria-hidden="true"></div>
-              <div class="card-body items-center text-center p-1.5 gap-0.5 relative z-10">
-                <span class="badge badge-xs invisible">·</span>
-                <span class="text-xs <%= player.id == current_player&.id ? "italic font-bold" : "font-semibold" %> <%= "underline" if player.admin? %> leading-tight break-words"><%= player.name %></span>
-                <span class="text-[0.65rem] opacity-70 js-tickets"><%= player.tickets %></span>
-              </div>
+              <%# Pill badge floats on the top edge; the fixed row height keeps it
+                  from shifting the grid when it appears. %>
+              <span class="js-badge absolute -top-2 left-1/2 -translate-x-1/2 hidden rounded-[4px] bg-[#2E6BD6] px-[7px] py-[2px] text-[8px] font-bold uppercase tracking-[.6px] text-white whitespace-nowrap"></span>
+              <span class="relative z-10 break-words text-[12px] font-bold leading-[1.05] <%= player_name_classes(player) %>"><%= player.name %></span>
+              <span class="relative z-10 font-tix flex items-baseline gap-[2px]">
+                <span class="js-tickets text-[12px] font-bold text-[#8A7A5E]"><%= player.tickets %></span>
+                <span class="js-plus hidden text-[11px] font-bold text-[#2E6BD6]">+1</span>
+              </span>
             </div>
           </button>
         <% end %>
       </div>
     </section>
 
-    <section class="text-center">
+    <%# Reserve the tallest state's height (the selecting question + button row)
+        so the composer below never shifts — neither while the wheel spins (both
+        areas hidden) nor when switching idle ↔ selecting. %>
+    <section class="text-center min-h-[7rem] flex flex-col justify-center">
       <%# Selecting: who is playing the chosen one's game? %>
       <div data-table-target="selectArea" class="hidden">
-        <p class="text-2xl mb-4">Who is playing with <span data-table-target="nomineeName"></span>?</p>
+        <p class="text-2xl mb-4 text-white [text-shadow:0_1px_3px_rgba(20,12,4,.5)]">Who is playing with <span data-table-target="nomineeName"></span>?</p>
         <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 actions-row">
           <div class="justify-self-start">
-            <button type="button" class="btn btn-sm btn-ghost" data-action="table#undoPick">Undo pick</button>
+            <button type="button" class="btn btn-sm btn-ghost text-white" data-action="table#undoPick">Undo pick</button>
           </div>
           <div class="justify-self-center flex items-center gap-3">
-            <button type="button" class="btn btn-ghost border border-base-content/30" data-action="table#selectAll">Select all</button>
+            <button type="button" class="btn btn-ghost border border-white/40 text-white" data-action="table#selectAll">Select all</button>
             <button type="button" class="btn btn-accent" data-action="table#send">Send</button>
           </div>
           <div></div>
@@ -210,10 +232,12 @@
           <div class="justify-self-start"></div>
           <div class="justify-self-center">
             <span data-table-target="pickArea" class="hidden">
-              <button type="button" class="btn btn-primary btn-lg" data-action="table#pick">Pick</button>
+              <button type="button"
+                      class="mx-auto flex h-[54px] w-[180px] items-center justify-center rounded-[12px] bg-primary text-[19px] font-bold text-primary-content shadow-[0_6px_0_#C8401C,0_10px_18px_rgba(0,0,0,.35)] transition-transform active:translate-y-[3px] active:shadow-[0_3px_0_#C8401C,0_6px_12px_rgba(0,0,0,.3)]"
+                      data-action="table#pick">Pick someone</button>
             </span>
             <span data-table-target="editArea" class="hidden">
-              <a data-table-target="editLink" href="#" class="btn btn-outline btn-neutral">edit</a>
+              <a data-table-target="editLink" href="#" class="btn btn-neutral">edit</a>
             </span>
             <span data-table-target="giftArea" class="hidden">
               <a data-table-target="giftLink" href="#" class="btn btn-primary btn-lg">Gift</a>
@@ -221,7 +245,7 @@
           </div>
           <div class="justify-self-end">
             <span data-table-target="shareArea" class="hidden">
-              <button type="button" class="btn btn-outline btn-neutral" data-action="table#share">share</button>
+              <button type="button" class="btn btn-neutral" data-action="table#share">share</button>
             </span>
           </div>
         </div>
@@ -235,7 +259,7 @@
         <% next unless can_share.call(player) %>
         <% link = player_url(player.uuid) %>
         <dialog id="share-modal-<%= player.id %>" class="modal">
-          <div class="modal-box text-center">
+          <div class="modal-box text-center text-base-content">
             <h3 class="text-lg font-bold mb-3"><%= player.name %>'s link</h3>
             <div class="mx-auto w-56 bg-white p-3 rounded"><%= qr_svg(link) %></div>
             <p class="mt-3 text-sm break-all"><%= link_to link, link, target: "_blank", rel: "noopener", class: "link link-primary" %></p>
@@ -244,7 +268,7 @@
             <% elsif player.admin? %>
               <p class="mt-2 text-sm text-warning">Anyone with this link can act as <%= player.name %>, taking any admin-level action.  Logs will show their actions under <%= player.name %>'s name.  Demote <%= player.name %> to revoke admin access.</p>
             <% else %>
-              <p class="mt-2 text-sm text-base-content/70">Anyone with this link can add players, pick pickers, mark them as playing, and gift <%= player.name %>'s tickets.  Logs will show their actions under <%= player.name %>'s name.  Delete <%= player.name %> to revoke access.</p>
+              <p class="mt-2 text-sm text-base-content/70">Anyone with this link can add players, start games, and gift <%= player.name %>'s tickets, logging these actions <%= player.name %>'s name.  Delete <%= player.name %> to revoke access.</p>
             <% end %>
             <div class="modal-action justify-center"><form method="dialog"><button class="btn">Close</button></form></div>
           </div>
@@ -258,16 +282,16 @@
 <% unless host_view? %>
   <%# ---- Add a player (hidden in edit mode, which shows the rename form) --- %>
   <% unless editing_player %>
-    <section class="mt-8 flex items-center justify-between gap-3">
-      <%= form_with url: app_players_path, scope: :player, class: "w-full max-w-xs" do |f| %>
+    <section class="mt-[18px] flex items-center gap-[11px]">
+      <%= form_with url: app_players_path, scope: :player, class: "w-full max-w-[320px]" do |f| %>
         <div class="relative">
           <%= f.text_field :name, placeholder: "Someone's name", autocomplete: "off",
                 autofocus: params[:added].present?, maxlength: 12,
-                class: "input input-bordered w-full pr-14 rounded-as-card" %>
-          <%= f.submit "+", class: "btn btn-secondary btn-sm rounded-as-card absolute right-1.5 top-1/2 -translate-y-1/2" %>
+                class: "w-full rounded-[10px] border border-[#E7DBC2] bg-[#FAF5EA] py-[9px] pl-[14px] pr-[46px] text-[13px] text-base-content placeholder:text-[#B3A079] shadow-[0_3px_8px_rgba(20,12,4,.25)] focus:outline-none" %>
+          <%= f.submit "+", class: "absolute right-[6px] top-1/2 -translate-y-1/2 h-[34px] w-[34px] cursor-pointer rounded-[8px] border-0 bg-secondary text-[18px] font-bold leading-none text-white" %>
         </div>
       <% end %>
-      <%= link_to "Show log", app_logs_path, class: "btn btn-ghost btn-sm" %>
+      <%= link_to "Show log", app_logs_path, class: "ml-auto font-bold text-[13px] text-white [text-shadow:0_1px_3px_rgba(20,12,4,.5)] whitespace-nowrap" %>
     </section>
   <% end %>
 <% end %>

@@ -1,0 +1,11 @@
+<%# The header label beside the logo: the host's name once set, otherwise the
+    someonepick.com wordmark (with the blue ".com"). Admins can click it to rename
+    (the click target / form live in hosts/show.html.erb). %>
+<% if @host.name.present? %>
+  <span class="font-display text-[28px] leading-none text-white [text-shadow:0_1px_4px_rgba(20,12,4,.55)] break-words"><%= @host.name %></span>
+<% else %>
+  <span class="flex items-baseline gap-px">
+    <span class="text-[16px] font-bold text-white [text-shadow:0_1px_3px_rgba(20,12,4,.5)]">someonepick</span>
+    <span class="text-[13px] font-bold text-[#9EC2FF] [text-shadow:0_1px_3px_rgba(20,12,4,.5)]">.com</span>
+  </span>
+<% end %>

@@ -1,15 +1,23 @@
-<%# Compact player card for the grid (claim / editing / gifting views).
-    locals: player, classes, tickets_display, badge (label or nil)
-    optional: card_data (hash of data-* attrs), mine (bool) %>
+<%# Compact player tile for the static grids (claim / editing / gifting views).
+    locals: player, tickets_display, badge (label or nil)
+    optional: present (bool — light-blue highlight), mine (bool),
+              plus (the "+1" string, e.g. "+1", or nil), card_data (data-* hash) %>
 <% card_data = local_assigns.fetch(:card_data, {}) %>
-<% mine = local_assigns.fetch(:mine, false) %>
-<div class="card <%= classes %> h-full transition-shadow" <%= tag.attributes(data: card_data) if card_data.any? %>>
-  <div class="card-body items-center text-center p-1.5 gap-0.5">
-    <%# Always render the badge line (invisible when empty) so card height is
-        constant — toggling a player on/off never shifts the grid. %>
-    <span class="badge badge-xs <%= badge ? "badge-neutral" : "invisible" %>"><%= badge || "·" %></span>
-    <%# Admins' names are underlined wherever a player card appears. %>
-    <span class="text-xs <%= mine ? "italic font-bold" : "font-semibold" %> <%= "underline" if player.admin? %> leading-tight break-words"><%= player.name %></span>
-    <span class="text-[0.65rem] opacity-70"><%= tickets_display %></span>
-  </div>
+<% mine    = local_assigns.fetch(:mine, false) %>
+<% present = local_assigns.fetch(:present, false) %>
+<% plus    = local_assigns.fetch(:plus, nil) %>
+<div class="relative h-full flex flex-col items-center justify-center gap-[3px] rounded-[11px] border px-1.5 text-center
+            <%= present ? "bg-[#DCE6FA] border-[1.5px] border-[#2E6BD6] shadow-[0_0_0_3px_rgba(46,107,214,.22),0_3px_8px_rgba(20,12,4,.3)]"
+                        : "bg-[#FAF5EA] border-[#E7DBC2] shadow-[0_3px_8px_rgba(20,12,4,.3)]" %>"
+     <%= tag.attributes(data: card_data) if card_data.any? %>>
+  <%# Pill badge floats on the top edge; the row's fixed height keeps it from
+      shifting the grid when it appears. %>
+  <% if badge %>
+    <span class="absolute -top-2 left-1/2 -translate-x-1/2 rounded-[4px] bg-[#2E6BD6] px-[7px] py-[2px] text-[8px] font-bold uppercase tracking-[.6px] text-white whitespace-nowrap"><%= badge %></span>
+  <% end %>
+  <span class="break-words text-[12px] font-bold leading-[1.05] <%= player_name_classes(player, mine: mine) %>"><%= player.name %></span>
+  <span class="font-tix flex items-baseline gap-[2px]">
+    <span class="text-[12px] font-bold <%= present ? "text-[#33271A]" : "text-[#8A7A5E]" %>"><%= tickets_display %></span>
+    <% if plus %><span class="text-[11px] font-bold text-[#2E6BD6]"><%= plus %></span><% end %>
+  </span>
 </div>
