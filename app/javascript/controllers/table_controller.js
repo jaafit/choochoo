@@ -27,6 +27,11 @@ export default class extends Controller {
     this.playing = new Set()
     this.phase = "idle"            // idle | spinning | selecting
     this.winnerId = null
+    // "Show the math" overlay for the last committed round: a Map of player id ->
+    // the expression to display (e.g. "5-2", "3+1"). It lingers after a send-off
+    // until a newer round is sent (a fresh log supersedes it) or the page reloads.
+    // Purely client-side; the server never knows about it.
+    this.lastRound = new Map()
     this.render()
   }
 
@@ -72,14 +77,30 @@ export default class extends Controller {
 
   async send() {
     if (this.phase !== "selecting") return
+    const chosenId = this.winnerId
+    const memberIds = [...this.playing]
+    // Snapshot each affected player's pre-send count ("N") now, while the cards
+    // still hold the old numbers, so the lingering math can show "N-P" / "N+1".
+    const priorOf = (id) => Math.max(0, Number(this.cardFor(id)?.dataset.tickets) || 0)
+    const chosenN = priorOf(chosenId)
+    const memberN = new Map(memberIds.map((id) => [id, priorOf(id)]))
+
     const data = await this.post(this.sendUrlValue,
-      { chosen_id: this.winnerId, member_ids: [...this.playing] })
+      { chosen_id: chosenId, member_ids: memberIds })
     if (!data) return
     this.applyRoster(data.roster)
+
+    // Rebuild the "show the math" overlay for this just-committed round. It
+    // replaces any prior round's math: the chosen pays one per player sent (P,
+    // floored at 0 -> capped at N), and each player sent earns +1.
+    this.lastRound = new Map()
+    this.lastRound.set(chosenId, `${chosenN}-${Math.min(memberIds.length, chosenN)}`)
+    memberN.forEach((n, id) => this.lastRound.set(id, `${n}+1`))
+
     // The picker and the players who played leave the room; anyone else who was
     // present stays selected, ready for the next round.
     this.playing.forEach((id) => this.present.delete(id))
-    this.present.delete(this.winnerId)
+    this.present.delete(chosenId)
     this.phase = "idle"
     this.winnerId = null
     this.playing = new Set()
@@ -170,12 +191,19 @@ export default class extends Controller {
 
     let look, label, display
     if (this.phase !== "idle" && id === this.winnerId) {
-      look = this.accent; label = "picker"; display = Math.max(0, base - this.playing.size)
+      // Picker mid-round: the present credit (+1) minus one per player in the
+      // game (the picker plus each player added). P is capped at N+1 so the
+      // result never drops below 0.
+      look = this.accent; label = "picker"
+      display = `${base}+1-${Math.min(this.playing.size + 1, base + 1)}`
     } else if (this.present.has(id)) {
       const playing = this.phase === "selecting" && this.playing.has(id)
       look = playing ? this.accent : this.primary
       label = playing ? "playing" : "present"
-      display = base + 1
+      display = `${base}+1`
+    } else if (this.lastRound.has(id)) {
+      // A finished round still showing its math until a newer round supersedes it.
+      look = this.baseLook; label = ""; display = this.lastRound.get(id)
     } else {
       look = this.baseLook; label = ""; display = base
     }
