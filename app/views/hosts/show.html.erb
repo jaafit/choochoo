@@ -36,10 +36,13 @@
   <% if @host.players.empty? %>
     <section class="mt-8 text-center">
       <p class="text-xl mb-4">Add yourself to get started.</p>
-      <%= form_with url: app_players_path, scope: :player, class: "flex flex-wrap items-center justify-center gap-3" do |f| %>
-        <%= f.text_field :name, placeholder: "Your name", autocomplete: "off",
-              autofocus: true, maxlength: 12, class: "input input-bordered" %>
-        <%= f.submit "+", class: "btn btn-primary" %>
+      <%= form_with url: app_players_path, scope: :player, class: "mx-auto w-full max-w-xs" do |f| %>
+        <div class="relative">
+          <%= f.text_field :name, placeholder: "Your name", autocomplete: "off",
+                autofocus: true, maxlength: 12,
+                class: "input input-bordered w-full pr-14 rounded-as-card" %>
+          <%= f.submit "+", class: "btn btn-primary btn-sm rounded-as-card absolute right-1.5 top-1/2 -translate-y-1/2" %>
+        </div>
       <% end %>
     </section>
   <% else %>
@@ -77,7 +80,7 @@
   </section>
 
   <section class="text-center">
-    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 actions-row">
       <div class="justify-self-start">
         <% unless p.admin? %>
           <%= button_to "delete", app_player_path(p), method: :delete, class: "btn btn-error",
@@ -104,11 +107,14 @@
 
   <%# Edit the focused player's name; "Done" saves and returns to the table. %>
   <section class="mt-8">
-    <%= form_with url: app_player_path(p), method: :patch, scope: :player,
-          class: "flex flex-wrap items-center gap-3" do |f| %>
-      <%= f.text_field :name, value: p.name, autocomplete: "off",
-            autofocus: true, maxlength: 12, class: "input input-bordered" %>
-      <%= f.submit "Done", class: "btn btn-primary" %>
+    <%= form_with url: app_player_path(p), method: :patch, scope: :player do |f| %>
+      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <%= f.text_field :name, value: p.name, autocomplete: "off",
+              autofocus: true, maxlength: 12,
+              class: "input input-bordered w-full max-w-xs justify-self-start rounded-as-card" %>
+        <%= f.submit "Done", class: "btn btn-primary justify-self-center" %>
+        <div></div>
+      </div>
     <% end %>
   </section>
 
@@ -129,7 +135,7 @@
 
   <section class="text-center">
     <p class="text-2xl mb-4">Give tickets to <%= r.name %></p>
-    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 actions-row">
       <div></div>
       <div class="justify-self-center flex items-center gap-3">
         <% if @host.can_undo_latest?(current_player) && @host.latest_log&.action == "gift" %>
@@ -182,7 +188,7 @@
       <%# Selecting: who is playing the chosen one's game? %>
       <div data-table-target="selectArea" class="hidden">
         <p class="text-2xl mb-4">Who is playing with <span data-table-target="nomineeName"></span>?</p>
-        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 actions-row">
           <div class="justify-self-start">
             <button type="button" class="btn btn-sm btn-ghost" data-action="table#undoPick">Undo pick</button>
           </div>
@@ -196,7 +202,7 @@
 
       <%# Idle: pick / edit / gift. %>
       <div data-table-target="idleArea">
-        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 actions-row">
           <div class="justify-self-start"></div>
           <div class="justify-self-center">
             <span data-table-target="pickArea" class="hidden">
@@ -248,16 +254,16 @@
 <% unless host_view? %>
   <%# ---- Add a player (hidden in edit mode, which shows the rename form) --- %>
   <% unless editing_player %>
-    <section class="mt-8">
-      <%= form_with url: app_players_path, scope: :player, class: "flex flex-wrap items-center gap-3" do |f| %>
-        <%= f.text_field :name, placeholder: "Someone's name", autocomplete: "off",
-              autofocus: params[:added].present?, maxlength: 12, class: "input input-bordered" %>
-        <%= f.submit "+", class: "btn btn-secondary" %>
+    <section class="mt-8 flex items-center justify-between gap-3">
+      <%= form_with url: app_players_path, scope: :player, class: "w-full max-w-xs" do |f| %>
+        <div class="relative">
+          <%= f.text_field :name, placeholder: "Someone's name", autocomplete: "off",
+                autofocus: params[:added].present?, maxlength: 12,
+                class: "input input-bordered w-full pr-14 rounded-as-card" %>
+          <%= f.submit "+", class: "btn btn-secondary btn-sm rounded-as-card absolute right-1.5 top-1/2 -translate-y-1/2" %>
+        </div>
       <% end %>
+      <%= link_to "Show log", app_logs_path, class: "btn btn-ghost btn-sm" %>
     </section>
   <% end %>
-
-  <section class="mt-10 text-center">
-    <%= link_to "Show log", app_logs_path, class: "btn btn-ghost btn-sm" %>
-  </section>
 <% end %>

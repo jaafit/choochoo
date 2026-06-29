@@ -19,3 +19,18 @@
 .btn {
   animation: none;
 }
+
+/* Match the name input (and its embedded "+" button) to the rounding of the
+   player cards in the grid, which use --rounded-box. !important is needed to
+   beat the .btn rounding rule above. */
+.rounded-as-card {
+  border-radius: var(--rounded-box) !important;
+}
+
+/* Every control row beneath the roster (idle / selecting / edit / gift) reserves
+   the same height, so the form below them never shifts when switching views —
+   even though each view is a separate server render. Sized to the tallest row,
+   which holds a btn-lg. */
+.actions-row {
+  min-height: 4rem;
+}
