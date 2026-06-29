@@ -9,8 +9,9 @@
   <% if @logs.empty? %>
     <p class="text-center opacity-70">No changes yet.</p>
   <% else %>
-    <%# Admins can undo the latest action here regardless of who did it — the only
-        place that override lives. Limited to the single latest log (send-off). %>
+    <%# Admins can undo the latest action here, of any kind — the only place that
+        override lives. Limited to the single latest log. The owner's own actions
+        can only be undone by the owner. %>
     <% latest = @page == 1 ? @logs.first : nil %>
     <ul class="divide-y divide-base-300">
       <% @logs.each do |log| %>
@@ -21,10 +22,23 @@
           <div class="text-left">
             <%= render "logs/entry", log: log %>
           </div>
-          <% if current_admin? && log == latest && log.action == "send_off" %>
-            <%= button_to "undo", app_undo_path, method: :post, class: "btn btn-xs btn-ghost ml-auto shrink-0",
-                  params: { log_id: log.id, admin: true },
-                  form: { data: { turbo_confirm: "Undo this send-off?" } } %>
+          <% if current_admin? && log == latest %>
+            <%# The owner's own actions can only be undone by the owner. %>
+            <% if log.actor_player_id == @host.owner_id && current_player&.id != @host.owner_id %>
+              <button type="button" class="btn btn-xs btn-ghost ml-auto shrink-0" disabled>undo</button>
+            <% else %>
+              <div class="ml-auto shrink-0" data-controller="confirm">
+                <button type="button" class="btn btn-xs btn-ghost"
+                        data-confirm-target="trigger" data-action="confirm#open">undo</button>
+                <span class="hidden" data-confirm-target="prompt">
+                  <%= form_with url: app_undo_path, method: :post, class: "inline-flex items-center gap-1" do |f| %>
+                    <%= f.hidden_field :log_id, value: log.id %>
+                    <%= f.button "confirm", type: "submit", class: "btn btn-xs btn-primary" %>
+                    <button type="button" class="btn btn-xs btn-ghost" data-action="confirm#cancel">cancel</button>
+                  <% end %>
+                </span>
+              </div>
+            <% end %>
           <% end %>
         </li>
       <% end %>

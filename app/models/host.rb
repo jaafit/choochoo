@@ -140,6 +140,27 @@ class Host < ApplicationRecord
     latest_log&.action == "send_off"
   end
 
+  # Reverse the latest log entry, whatever its action — the admins-only override
+  # offered from the logs page. Only runs while `log` is still the latest entry,
+  # so every reverser's stored state (ticket snapshots, the deleted player's
+  # attributes) is still current. The owner's own actions are off-limits; the
+  # caller enforces that. Returns true when something was reversed.
+  def undo_latest!(log)
+    return false unless log && log == latest_log
+
+    case log.action
+    when "send_off"   then restore_send_off!(log)
+    when "gift"       then !!undo_gift!   # admin override: no `by`
+    when "add"        then revert_ticket!(log, -1)
+    when "subtract"   then revert_ticket!(log, +1)
+    when "promote"    then revert_role!(log, admin: false)
+    when "demote"     then revert_role!(log, admin: true)
+    when "add_player" then revert_add_player!(log)
+    when "delete"     then revert_delete!(log)
+    else false
+    end
+  end
+
   # Reverse a send-off: restore every affected player's ticket count from the
   # log's snapshot and delete the log. Callers verify `log` is the latest entry
   # first, so the snapshot is still current — any later change would have created
@@ -216,13 +237,61 @@ class Host < ApplicationRecord
   end
 
   # Record a player deletion (call before the player is destroyed). `actor` is the
-  # admin who deleted them.
+  # admin who deleted them. We snapshot the player's attributes so an admin can undo
+  # the deletion from the logs page while it's still the latest entry — recreating
+  # them with the same uuid keeps any bookmarked player URL working.
   def log_delete!(player, actor: nil)
     logs.create!(action: "delete", player_name: player.name, player_id: player.id,
-                 actor_player_id: actor&.id, actor_name: actor&.name)
+                 actor_player_id: actor&.id, actor_name: actor&.name,
+                 data: { "tickets" => player.tickets, "admin" => player.admin, "uuid" => player.uuid })
   end
 
   private
+
+  # Reverse a single edit-mode ticket change (+1 / -1), floored at 0, then drop
+  # the log. `delta` is the inverse of what the log applied.
+  def revert_ticket!(log, delta)
+    player = players.find_by(id: log.player_id)
+    transaction do
+      player&.update!(tickets: [ player.tickets + delta, 0 ].max)
+      log.destroy
+    end
+    true
+  end
+
+  # Reverse a promote/demote by restoring the prior admin flag, then drop the log.
+  def revert_role!(log, admin:)
+    player = players.find_by(id: log.player_id)
+    transaction do
+      player&.update!(admin: admin)
+      log.destroy
+    end
+    true
+  end
+
+  # Undo an add: remove the just-added player. Safe because undo only runs while
+  # this is the latest log, so nothing has happened to them since.
+  def revert_add_player!(log)
+    transaction do
+      players.where(id: log.player_id).destroy_all
+      log.destroy
+    end
+    true
+  end
+
+  # Undo a delete: recreate the player from the snapshot taken at deletion. Old
+  # delete logs without a snapshot bring the player back by name with defaults.
+  def revert_delete!(log)
+    snap = log.data || {}
+    transaction do
+      players.create!(name: log.player_name,
+                      tickets: snap["tickets"].to_i,
+                      admin: !!snap["admin"],
+                      uuid: snap["uuid"].presence || SecureRandom.uuid)
+      log.destroy
+    end
+    true
+  end
 
   def normalize_name
     name&.strip!
