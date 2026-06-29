@@ -172,8 +172,12 @@
                   data-table-target="card" data-action="click->table#tapCard"
                   data-player-id="<%= player.id %>" data-tickets="<%= player.tickets %>"
                   data-name="<%= player.name %>" data-owner="<%= player.id == @host.owner_id %>">
-            <div class="card h-full transition-shadow bg-base-100 shadow-md">
-              <div class="card-body items-center text-center p-1.5 gap-0.5">
+            <div class="card h-full transition-shadow bg-base-100 shadow-md relative">
+              <%# Per-ticket cells laid over the card during the pick animation. The
+                  table controller fills these and flicks a highlight through them;
+                  they're an absolute overlay so the name/math never shift. %>
+              <div class="js-rail absolute inset-0 p-2 hidden items-stretch gap-1" aria-hidden="true"></div>
+              <div class="card-body items-center text-center p-1.5 gap-0.5 relative z-10">
                 <span class="badge badge-xs invisible">·</span>
                 <span class="text-xs <%= player.id == current_player&.id ? "italic font-bold" : "font-semibold" %> <%= "underline" if player.admin? %> leading-tight break-words"><%= player.name %></span>
                 <span class="text-[0.65rem] opacity-70 js-tickets"><%= player.tickets %></span>

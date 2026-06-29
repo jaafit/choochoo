@@ -35,7 +35,7 @@ export default class extends Controller {
     this.render()
   }
 
-  disconnect() { clearTimeout(this.timer) }
+  disconnect() { clearTimeout(this.timer); this.clearRails() }
 
   // --- interactions ---------------------------------------------------------
 
@@ -109,24 +109,28 @@ export default class extends Controller {
 
   // --- pick animation -------------------------------------------------------
 
-  // Hop a ticket-weighted highlight among the present cards for ~2s, then settle
-  // into the selecting view with the real (server-chosen) winner lit.
+  // Lay every present player's tickets out as little dashed cells, then flick a
+  // highlight among all the cells for ~2s — each ticket equally likely, so a
+  // player's odds scale with how many they hold. Never the same cell twice in a
+  // row, though the same player can light up again on a different ticket. When it
+  // settles we tear the cells down and light the server-chosen winner's card.
   animatePick(winnerId) {
-    const cards = [...this.present].map((id) => this.cardFor(id)).filter(Boolean)
-    if (cards.length < 2) { this.winnerId = winnerId; this.phase = "selecting"; this.render(); return }
+    const cells = this.buildRails()
+    const settle = () => {
+      this.clearRails()
+      this.winnerId = winnerId
+      this.phase = "selecting"
+      this.render()
+    }
+    if (cells.length < 2) { settle(); return }
 
     this.phase = "spinning"
     this.render()
     let delay = 90, elapsed = 0, current = null
     const hop = () => {
-      current = this.weightedNext(cards, current)
-      cards.forEach((c) => this.setLook(c.querySelector(".card"), c === current ? this.accent : this.primary))
-      if (elapsed >= 2200) {
-        this.winnerId = winnerId
-        this.phase = "selecting"
-        this.render()
-        return
-      }
+      current = this.nextCell(cells, current)
+      cells.forEach((c) => c.classList.toggle("bg-accent", c === current))
+      if (elapsed >= 2500) { settle(); return }
       this.timer = setTimeout(hop, delay)
       elapsed += delay
       delay = Math.min(320, delay * 1.12)
@@ -134,13 +138,49 @@ export default class extends Controller {
     hop()
   }
 
-  weightedNext(cards, current) {
-    const pool = cards.filter((c) => c !== current)
-    const choices = pool.length ? pool : cards
-    const weight = (c) => Math.max(0, Number(c.dataset.tickets) || 0) + 1
-    let roll = Math.random() * choices.reduce((s, c) => s + weight(c), 0)
-    for (const c of choices) { roll -= weight(c); if (roll < 0) return c }
-    return choices[choices.length - 1]
+  // A random cell with equal weight per ticket, never the one currently lit.
+  nextCell(cells, current) {
+    const pool = cells.filter((c) => c !== current)
+    return pool[Math.floor(Math.random() * pool.length)]
+  }
+
+  // Fill each present player's rail with one dashed cell per ticket, side by
+  // side. We use their present count (tickets + 1) to match the server's pick
+  // weighting, so everyone present has at least one cell. Returns the flat list
+  // of cells so the animation can flick a highlight across them.
+  buildRails() {
+    const cells = []
+    this.cardTargets.forEach((el) => {
+      const rail = el.querySelector(".js-rail")
+      if (!rail) return
+      rail.innerHTML = ""
+      if (!this.present.has(Number(el.dataset.playerId))) return
+      const tickets = Math.max(0, Number(el.dataset.tickets) || 0)
+      const n = tickets + 1
+      // 4 columns, at least 2 rows so anyone with 8 or fewer tickets gets the same
+      // cell size; beyond 8 we add rows, shrinking the cells to fit.
+      rail.style.gridTemplateColumns = "repeat(4, 1fr)"
+      rail.style.gridTemplateRows = `repeat(${Math.max(2, Math.ceil(n / 4))}, 1fr)`
+      // Past 8 tickets the cells are getting cramped, so tighten the gap to
+      // gap-0.5 (2px) from the rail's default gap-1 (4px); otherwise keep default.
+      rail.style.gap = tickets > 8 ? "2px" : ""
+      for (let i = 0; i < n; i++) {
+        const cell = document.createElement("div")
+        cell.className = "ticket-cell rounded-md text-primary"
+        rail.appendChild(cell)
+        cells.push(cell)
+      }
+      rail.classList.remove("hidden")
+      rail.classList.add("grid")
+    })
+    return cells
+  }
+
+  clearRails() {
+    this.cardTargets.forEach((el) => {
+      const rail = el.querySelector(".js-rail")
+      if (rail) { rail.innerHTML = ""; rail.classList.add("hidden"); rail.classList.remove("grid") }
+    })
   }
 
   // --- rendering ------------------------------------------------------------
@@ -198,7 +238,9 @@ export default class extends Controller {
       display = `${base}+1-${Math.min(this.playing.size + 1, base + 1)}`
     } else if (this.present.has(id)) {
       const playing = this.phase === "selecting" && this.playing.has(id)
-      look = playing ? this.accent : this.primary
+      // While the wheel spins, present cards drop to the base look so the dashed
+      // ticket cells overlaid on them stay legible; the highlight rides the cells.
+      look = this.phase === "spinning" ? this.baseLook : (playing ? this.accent : this.primary)
       label = playing ? "playing" : "present"
       display = `${base}+1`
     } else if (this.lastRound.has(id)) {
@@ -208,11 +250,16 @@ export default class extends Controller {
       look = this.baseLook; label = ""; display = base
     }
 
+    // While a card is animating (present, mid-spin) only its name shows over the
+    // ticket cells — the tag and the ticket math hide (kept in flow via
+    // visibility so nothing shifts when the spin starts or stops).
+    const animating = this.phase === "spinning" && this.present.has(id)
     this.setLook(card, look)
     badge.textContent = label || "·"
-    badge.classList.toggle("invisible", !label)
+    badge.classList.toggle("invisible", animating || !label)
     badge.classList.toggle("badge-neutral", !!label)
     tix.textContent = display
+    tix.classList.toggle("invisible", animating)
   }
 
   // --- helpers --------------------------------------------------------------

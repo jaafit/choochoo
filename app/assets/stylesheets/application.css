@@ -27,6 +27,22 @@
   border-radius: var(--rounded-box) !important;
 }
 
+/* Ticket cells in the pick animation. The dashed outline is drawn with edge
+   gradients (in currentColor — set to the primary color via .text-primary) so we
+   can make the dashes shorter and more frequent than the browser's native dashed
+   border allows. Using background-image (not the `background` shorthand) leaves
+   background-color free, so the highlight fill (bg-secondary) still shows. */
+.ticket-cell {
+  background-image:
+    repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 3px),
+    repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 3px),
+    repeating-linear-gradient(0deg, currentColor 0 2px, transparent 2px 3px),
+    repeating-linear-gradient(0deg, currentColor 0 2px, transparent 2px 3px);
+  background-position: top, bottom, left, right;
+  background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%;
+  background-repeat: no-repeat;
+}
+
 /* Every control row beneath the roster (idle / selecting / edit / gift) reserves
    the same height, so the form below them never shifts when switching views —
    even though each view is a separate server render. Sized to the tallest row,
