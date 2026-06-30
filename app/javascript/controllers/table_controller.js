@@ -10,8 +10,8 @@ import { Controller } from "@hotwired/stimulus"
 // roster, which we reconcile into the grid; there is no background polling.
 export default class extends Controller {
   static targets = [
-    "card", "idleArea", "selectArea", "pickArea",
-    "editArea", "giftArea", "shareArea", "editLink", "giftLink", "nomineeName"
+    "card", "idleArea", "selectArea", "shareSelectArea", "pickArea",
+    "editArea", "giftArea", "shareArea", "shareStartArea", "editLink", "giftLink", "nomineeName"
   ]
   static values = {
     nominateUrl: String, sendUrl: String,
@@ -31,7 +31,7 @@ export default class extends Controller {
   connect() {
     this.present = new Set()
     this.playing = new Set()
-    this.phase = "idle"            // idle | spinning | selecting
+    this.phase = "idle"            // idle | spinning | selecting | sharing
     this.winnerId = null
     this.render()
   }
@@ -43,6 +43,12 @@ export default class extends Controller {
   tapCard(event) {
     const id = Number(event.currentTarget.dataset.playerId)
     if (this.phase === "spinning") return
+    if (this.phase === "sharing") {
+      // Tapping a card shares that player. The owner has no popup, so nothing
+      // happens for them — stay in sharing.
+      this.openShare(id)
+      return
+    }
     if (this.phase === "selecting") {
       if (id === this.winnerId || !this.present.has(id)) return
       this.playing.has(id) ? this.playing.delete(id) : this.playing.add(id)
@@ -178,8 +184,10 @@ export default class extends Controller {
 
     const idle = this.phase === "idle"
     const selecting = this.phase === "selecting"
+    const sharing = this.phase === "sharing"
     this.toggle(this.idleAreaTarget, idle)
     this.toggle(this.selectAreaTarget, selecting)
+    this.toggle(this.shareSelectAreaTarget, sharing)
 
     if (selecting && this.hasNomineeNameTarget) {
       this.nomineeNameTarget.textContent = this.nameFor(this.winnerId)
@@ -188,6 +196,8 @@ export default class extends Controller {
 
     const one = this.present.size === 1 ? [...this.present][0] : null
     this.toggle(this.pickAreaTarget, this.present.size >= 2)
+    // With nobody selected, an admin gets a share button that opens sharing mode.
+    this.toggle(this.shareStartAreaTarget, this.adminValue && this.present.size === 0)
 
     // Other admins can edit anyone except the owner; only the owner edits the owner.
     const showEdit = this.adminValue && one != null && !(this.isOwner(one) && !this.isOwner(this.myIdValue))
@@ -201,11 +211,39 @@ export default class extends Controller {
     if (showGift) this.giftLinkTarget.href = `${this.baseValue}?gifting=${one}`
   }
 
+  // With nobody selected, an admin can share any player: enter sharing mode,
+  // where the "Share with whom?" prompt shows and tapping a card opens that
+  // player's popup. Cancel returns to idle.
+  startShare() {
+    if (this.phase !== "idle" || this.present.size !== 0) return
+    this.phase = "sharing"
+    this.render()
+  }
+
+  cancelShare() {
+    if (this.phase !== "sharing") return
+    this.phase = "idle"
+    this.render()
+  }
+
   // Open the pre-rendered popup for the single present player.
   share() {
     const one = this.present.size === 1 ? [...this.present][0] : null
     if (one == null) return
-    document.getElementById(`share-modal-${one}`)?.showModal()
+    this.openShare(one)
+  }
+
+  // Open a player's share popup; closing it deselects everyone and returns the
+  // table to a clean idle state.
+  openShare(id) {
+    const modal = document.getElementById(`share-modal-${id}`)
+    if (!modal) return
+    modal.addEventListener("close", () => {
+      this.present.clear()
+      this.phase = "idle"
+      this.render()
+    }, { once: true })
+    modal.showModal()
   }
 
   isOwner(id) { return this.cardFor(id)?.dataset.owner === "true" }

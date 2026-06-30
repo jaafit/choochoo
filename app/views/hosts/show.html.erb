@@ -226,6 +226,19 @@
         </div>
       </div>
 
+      <%# Sharing: admin chose to share with nobody selected; tapping a card opens
+          that player's share popup (see table_controller#tapCard). %>
+      <div data-table-target="shareSelectArea" class="hidden">
+        <p class="text-2xl mb-4 text-white [text-shadow:0_1px_3px_rgba(20,12,4,.5)]">Share with whom?</p>
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 actions-row">
+          <div class="justify-self-start">
+            <button type="button" class="btn btn-sm btn-ghost text-white" data-action="table#cancelShare">Cancel</button>
+          </div>
+          <div></div>
+          <div></div>
+        </div>
+      </div>
+
       <%# Idle: pick / edit / gift. %>
       <div data-table-target="idleArea">
         <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 actions-row">
@@ -244,8 +257,20 @@
             </span>
           </div>
           <div class="justify-self-end">
+            <% share_icon = capture do %>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+              </svg>
+            <% end %>
             <span data-table-target="shareArea" class="hidden">
-              <button type="button" class="btn btn-neutral" data-action="table#share">share</button>
+              <button type="button" class="btn btn-neutral btn-square" aria-label="Share" data-action="table#share"><%= share_icon %></button>
+            </span>
+            <span data-table-target="shareStartArea" class="hidden">
+              <button type="button" class="btn btn-neutral btn-square" aria-label="Share" data-action="table#startShare"><%= share_icon %></button>
             </span>
           </div>
         </div>
